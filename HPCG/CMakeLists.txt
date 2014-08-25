@@ -36,7 +36,17 @@ else()
   set(HPCG_NOMPI ON CACHE BOOL "Don't use MPI" FORCE)
 endif()
 
-set(HPCG_DEBUG OFF CACHE BOOL "Enable additional debug output" FORCE)
+if(DEFINED HPCG_DEBUG)
+    set(HPCG_DEBUG ${HPCG_DEBUG} CACHE BOOL "Enable additional debug output" FORCE)
+else()
+    set(HPCG_DEBUG OFF CACHE BOOL "Enable additional debug output" FORCE)
+endif()
+
+if(DEFINED HPCG_DETAILED_DEBUG)
+    set(HPCG_DETAILED_DEBUG ${HPCG_DETAILED_DEBUG} CACHE BOOL "Enable more detailed debug output" FORCE)
+else()
+    set(HPCG_DETAILED_DEBUG OFF CACHE BOOL "Enable more detailed debug output" FORCE)
+endif()
 
 # Instruct cmake to find the HPX settings
 if(NOT HPCG_NOHPX)
@@ -75,8 +85,12 @@ else()
     add_definitions("-DHPCG_NOMPI")
 endif()
 
-if(HPCG_DEBUG)
+if(HPCG_DEBUG OR HPCG_DETAILED_DEBUG)
     add_definitions("-DHPCG_DEBUG")
+endif()
+
+if(HPCG_DETAILED_DEBUG)
+    add_definitions("-DHPCG_DETAILED_DEBUG")
 endif()
 
 add_subdirectory(src)
