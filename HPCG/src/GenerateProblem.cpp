@@ -116,6 +116,7 @@ void GenerateProblem(SparseMatrix & A, Vector * b, Vector * x, Vector * xexact) 
 
   local_int_t localNumberOfNonzeros = 0;
   // TODO:  This triply nested loop could be flattened or use nested parallelism
+  // NOTE: this TODO comes from original HPCG repositorry.
 #ifndef HPCG_NOOPENMP
   #pragma omp parallel for
 #endif

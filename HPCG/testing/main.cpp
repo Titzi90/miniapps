@@ -96,10 +96,11 @@ std::cout<<"using mpi"<<endl;
 
   HPCG_Init(&argc, &argv, params);
 
-  int size = params.comm_size, rank = params.comm_rank; // Number of MPI processes, My process ID
+  int size = params.comm_size, rank = params.comm_rank; // Number of MPI processes/HPX localitys, My MPI process ID/HPX locality ID
 
 #ifdef HPCG_DETAILED_DEBUG
-  if (size < 100 && rank==0) HPCG_fout << "Process "<<rank<<" of "<<size<<" is alive with " << params.numThreads << " threads." <<endl;
+  if (size < 100 ) HPCG_fout << "Process "<<rank<<" of "<<size<<" is alive with " << params.numThreads << " threads." <<endl;
+  else if (rank == 0 ) HPCG_fout << "Process "<<rank<<" of "<<size<<" is alive with " << params.numThreads << " threads." <<endl;
 
   if (rank==0) {
     char c;
@@ -180,13 +181,14 @@ std::cout<<"using mpi"<<endl;
   if (rank==0) HPCG_fout << "Total validation (TestCG and TestSymmetry) execution time in main (sec) = " << mytimer() - t1 << endl;
 #endif
 
-#ifdef HPCG_DEBUG
-  t1 = mytimer();
-#endif
 
   ///////////////////////////////////////
   // Reference SpMV+MG Timing Phase //
   ///////////////////////////////////////
+
+#ifdef HPCG_DEBUG
+  t1 = mytimer();
+#endif
 
   // Call Reference SpMV and MG. Compute Optimization time as ratio of times in these routines
 
@@ -207,7 +209,7 @@ std::cout<<"using mpi"<<endl;
   for (int i=0; i< numberOfCalls; ++i) {
     ierr = ComputeSPMV_ref(A, x_overlap, b_computed); // b_computed = A*x_overlap
     if (ierr) HPCG_fout << "Error in call to SpMV: " << ierr << ".\n" << endl;
-    ierr = ComputeMG_ref(A, b_computed, x_overlap); // b_computed = Minv*y_overlap
+    ierr = ComputeMG_ref(A, b_computed, x_overlap); // b_computed = Minv*x_overlap
     if (ierr) HPCG_fout << "Error in call to MG: " << ierr << ".\n" << endl;
   }
   times[8] = (mytimer() - t_begin)/((double) numberOfCalls);  // Total time divided by number of calls.
@@ -244,10 +246,16 @@ std::cout<<"using mpi"<<endl;
   if (rank == 0 && err_count) HPCG_fout << err_count << " error(s) in call(s) to reference CG." << endl;
   double refTolerance = normr / normr0;
 
+#ifdef HPCG_DEBUG
+  if (rank==0) HPCG_fout << "Total Reference CG timing phase execution time in main (sec) = " << mytimer() - t1 << endl;
+#endif
   //////////////////////////////
   // Optimized CG Setup Phase //
   //////////////////////////////
 
+#ifdef HPCG_DEBUG
+  t1 = mytimer();
+#endif
   niters = 0;
   normr = 0.0;
   normr0 = 0.0;
@@ -289,10 +297,16 @@ std::cout<<"using mpi"<<endl;
       HPCG_fout << "Failed to reduce the residual " << tolerance_failures << " times." << endl;
   }
 
+#ifdef HPCG_DEBUG
+  if (rank==0) HPCG_fout << "Total optimized CG setup phase execution time in main (sec) = " << mytimer() - t1 << endl;
+#endif
   ///////////////////////////////
   // Optimized CG Timing Phase //
   ///////////////////////////////
 
+#ifdef HPCG_DEBUG
+  t1 = mytimer();
+#endif
   // Here we finally run the benchmark phase
   // The variable total_runtime is the target benchmark execution time in seconds
 
@@ -326,7 +340,7 @@ std::cout<<"using mpi"<<endl;
   // All processors are needed here.
 #ifdef HPCG_DEBUG
   double residual = 0;
-  ierr = ComputeResidual(A.localNumberOfRows, x, xexact, residual);
+  ierr = ComputeResidual(A.localNumberOfRows, x, xexact, residual); // Inf. Norm
   if (ierr) HPCG_fout << "Error in call to compute_residual: " << ierr << ".\n" << endl;
   if (rank==0) HPCG_fout << "Difference between computed and exact  = " << residual << ".\n" << endl;
 #endif
@@ -334,10 +348,17 @@ std::cout<<"using mpi"<<endl;
   // Test Norm Results
   ierr = TestNorms(testnorms_data);
 
+#ifdef HPCG_DEBUG
+  if (rank==0) HPCG_fout << "Total optimized CG timing phase execution time in main (sec) = " << mytimer() - t1 << endl;
+#endif
+
   ////////////////////
   // Report Results //
   ////////////////////
 
+#ifdef HPCG_DEBUG
+  t1 = mytimer();
+#endif
   // Report results to YAML file
   ReportResults(A, numberOfMgLevels, numberOfCgSets, refMaxIters, optMaxIters, &times[0], testcg_data, testsymmetry_data, testnorms_data, global_failure);
 
@@ -358,6 +379,10 @@ std::cout<<"using mpi"<<endl;
   // Finish up
 #ifndef HPCG_NOMPI
   MPI_Finalize();
+#endif
+
+#ifdef HPCG_DEBUG
+  HPCG_fout << "Total report results phase execution time in main (sec) = " << mytimer() - t1 << endl;
 #endif
   return 0 ;
 }

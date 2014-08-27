@@ -39,7 +39,7 @@ using std::endl;
 #include "mytimer.hpp"
 
 /*!
-  Prepares system matrix data structure and creates data necessary necessary
+  Prepares system matrix data structure and creates data necessary
   for communication of boundary values of this process.
 
   @param[in]    geom The description of the problem's geometry.
@@ -78,18 +78,25 @@ void SetupHalo(SparseMatrix & A) {
   std::map< local_int_t, local_int_t > externalToLocalMap;
 
   // TODO: With proper critical and atomic regions, this loop could be threaded, but not attempting it at this time
+  // NOTE: this TODO comes from original HPCG repo
   for (local_int_t i=0; i< localNumberOfRows; i++) {
     global_int_t currentGlobalRow = A.localToGlobalMap[i];
     for (int j=0; j<nonzerosInRow[i]; j++) {
       global_int_t curIndex = mtxIndG[i][j];
       int rankIdOfColumnEntry = ComputeRankOfMatrixRow(*(A.geom), curIndex);
+      if (A.geom->rank!=rankIdOfColumnEntry) {// If column index is not a row index, then it comes from another processor
+        receiveList[rankIdOfColumnEntry].insert(curIndex);
+        sendList[rankIdOfColumnEntry].insert(currentGlobalRow); // Matrix symmetry means we know the neighbor process wants my value
+#ifdef HPCG_DETAILED_DEBUG
+      HPCG_fout << "rank, row , col, on Node withe rank = " << A.geom->rank << " " << currentGlobalRow << " "
+          << curIndex << " " << rankIdOfColumnEntry << endl;
+#endif
+      }
+      else{
 #ifdef HPCG_DETAILED_DEBUG
       HPCG_fout << "rank, row , col, globalToLocalMap[col] = " << A.geom->rank << " " << currentGlobalRow << " "
           << curIndex << " " << A.globalToLocalMap[curIndex] << endl;
 #endif
-      if (A.geom->rank!=rankIdOfColumnEntry) {// If column index is not a row index, then it comes from another processor
-        receiveList[rankIdOfColumnEntry].insert(curIndex);
-        sendList[rankIdOfColumnEntry].insert(currentGlobalRow); // Matrix symmetry means we know the neighbor process wants my value
       }
     }
   }
