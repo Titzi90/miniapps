@@ -44,7 +44,7 @@ include_directories(".")
 if(HPCG_NOHPX)
   add_executable(hpcg ${SOURCES})
   set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++0x")
-  if(HPCG_MPI)
+  if(NOT HPCG_NOMPI)
      target_link_libraries(hpcg ${MPI_LIBRARIES})
      if(MPI_COMPILE_FLAGS)
          set_target_properties(hpcg PROPERTIES COMPILE_FLAGS "${MPI_COMPILE_FLAGS}")
@@ -66,7 +66,9 @@ else()
   endif()
   add_hpx_executable(hpcg
     MODULE hpcg
-    SOURCES ${SOURCES})
+    SOURCES ${SOURCES}
+    COMPONENT_DEPENDENCIES iostreams
+  )
 endif()
 
 

@@ -21,9 +21,10 @@
 // Main routine of a program that calls the HPCG conjugate gradient
 // solver to solve the problem, and then prints results.
 
-#if !defined(HPCG_NOHPX)
+#ifndef HPCG_NOHPX
 #include <hpx/hpx_fwd.hpp>
 #include <hpx/hpx_main.hpp>
+#include <hpx/include/iostreams.hpp>
 #endif
 
 #ifndef HPCG_NOMPI
@@ -99,8 +100,11 @@ std::cout<<"using mpi"<<endl;
   int size = params.comm_size, rank = params.comm_rank; // Number of MPI processes/HPX localitys, My MPI process ID/HPX locality ID
 
 #ifdef HPCG_DETAILED_DEBUG
-  if (size < 100 ) HPCG_fout << "Process "<<rank<<" of "<<size<<" is alive with " << params.numThreads << " threads." <<endl;
-  else if (rank == 0 ) HPCG_fout << "Process "<<rank<<" of "<<size<<" is alive with " << params.numThreads << " threads." <<endl;
+#ifndef HPCG_NOHPX
+  hpx::cout << "Process "<<rank<<" of "<<size<<" is alive with " << params.numThreads << " threads.\n" << hpx::flush;
+#else
+  std::cerr << "Process "<<rank<<" of "<<size<<" is alive with " << params.numThreads << " threads." <<endl;
+#endif
 
   if (rank==0) {
     char c;
