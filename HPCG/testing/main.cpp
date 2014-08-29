@@ -78,7 +78,10 @@ int main(int argc, char * argv[]) {
 
 
 #ifndef HPCG_NOHPX
-std::cout<<"Using HPX"<<endl;
+if(0 == hpx::get_locality_id())
+{
+  std::cout<<"Using HPX"<<endl;
+}
 #endif
 
 #ifndef HPCG_NOOPENMP
