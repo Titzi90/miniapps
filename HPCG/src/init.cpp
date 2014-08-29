@@ -121,7 +121,7 @@ HPCG_Init(int * argc_p, char ** *argv_p, HPCG_Params & params) {
 #ifdef HPCG_NOHPX
   params.numThreads = 1;
 #else
-  params.numThreads = (int)hpx::get_num_worker_threads();
+  params.numThreads = (int)hpx::get_num_worker_threads() / params.comm_size;
 #endif
 #else
   #pragma omp parallel
@@ -139,7 +139,7 @@ HPCG_Init(int * argc_p, char ** *argv_p, HPCG_Params & params) {
 #if defined(HPCG_DEBUG) || defined(HPCG_DETAILED_DEBUG)
     char local[15];
     sprintf( local, "%d_", params.comm_rank );
-    sprintf( fname, "hpcg_log_%s%04.d%02d.%02d.%02d.%02d.%02d.txt", local,
+    sprintf( fname, "hpcg_log_%s%04d.%02d.%02d.%02d.%02d.%02d.txt", local,
         1900 + ptm->tm_year, ptm->tm_mon+1, ptm->tm_mday, ptm->tm_hour, ptm->tm_min, ptm->tm_sec );
     HPCG_fout.open(fname);
 #else

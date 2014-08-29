@@ -101,9 +101,9 @@ std::cout<<"using mpi"<<endl;
 
 #ifdef HPCG_DETAILED_DEBUG
 #ifndef HPCG_NOHPX
-  hpx::cout << "Process "<<rank<<" of "<<size<<" is alive with " << params.numThreads << " threads.\n" << hpx::flush;
+  HPCG_fout << "Process "<<rank<<" of "<<size<<" is alive with " << params.numThreads << " threads.\n" << hpx::flush;
 #else
-  std::cerr << "Process "<<rank<<" of "<<size<<" is alive with " << params.numThreads << " threads." <<endl;
+  HPCG_fout << "Process "<<rank<<" of "<<size<<" is alive with " << params.numThreads << " threads." <<endl;
 #endif
 
   if (rank==0) {
