@@ -20,6 +20,8 @@
 
 int ComputeSPMV( const SparseMatrix & A, Vector & x, Vector & y);
 #if !defined(HPCG_NOHPX)
+#include <hpx/hpx.hpp>
+
 hpx::future<void> ComputeSPMV_async( const SparseMatrix & A, Vector & x, Vector & y);
 #endif
 
