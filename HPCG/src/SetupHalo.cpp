@@ -65,6 +65,8 @@ void SetupHalo(SparseMatrix & A) {
     for (int j=0; j<cur_nnz; j++) mtxIndL[i][j] = mtxIndG[i][j];
   }
 
+//TODO HPX on more nodes need mpi for validation as well
+
 #else // Run this section if compiling for MPI
 
   // Scan global IDs of the nonzeros in the matrix.  Determine if the column ID matches a row ID.  If not:

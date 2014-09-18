@@ -60,12 +60,11 @@ void GenerateCoarseProblem(const SparseMatrix & Af) {
   #pragma omp parallel for
 #endif
   for (local_int_t i=0; i< localNumberOfRows; ++i) {
-    f2cOperator[i] = 0;
+    f2cOperator[i] = 0;     //why is f2c so big andy way I zero it here? BZW c2fwould be a better name
   }
 
-
   // TODO:  This triply nested loop could be flattened or use nested parallelism
-  // NOTE: this TODO is from origiel HPCG repo
+  // NOTE: this todo is from origiel HPCG repo
 #ifndef HPCG_NOOPENMP
   #pragma omp parallel for
 #endif
