@@ -18,15 +18,28 @@
 #include "SparseMatrix.hpp"
 #include "Vector.hpp"
 #include "CGData.hpp"
+#include <cassert>
 
 #ifndef HPCG_NOHPX
 
 #include <hpx/hpx.hpp>
 
 
+/*******************MATRIX*****************************************************/
 
-//TODO daten thread save machen
-struct LocalSubDomain_STRUCT {
+// datastructure of Matrixvalues
+struct MatrixValues{
+    double ** values;
+    double ** diagonal;
+    global_int_t ** indG;   // Pointer to matrix indexi of the global domain TODO ???
+    local_int_t ** indLoc;  // Pointer to matrix indexi of the localyty domain
+    char * nonzerosInRow;
+};
+typedef hpx::shared_future<MatrixValues> MatrixValues_furure;
+
+
+// SubMatrix including values and geometic data
+struct SubDomain{
     //TODO constant geo values out of future
     int nlpx;       // number of local sub process in x direction.
     int nlpy;       // number of local sub process in y direction.
@@ -40,46 +53,85 @@ struct LocalSubDomain_STRUCT {
     int nlz ;       // number of local points in z direction
     local_int_t localNumberRows;
 
-    double ** matrixValues;
-    double ** matrixDiagonal;
-    global_int_t ** mtxIndG;   // Pointer to matrix indexi of the global domain
-    local_int_t ** mtxIndLoc;  // Pointer to matrix indexi of the localyty domain
-    char * nonzerosInRow;
-
+    MatrixValues_furure matrixValues;
 };
-typedef struct LocalSubDomain_STRUCT LocalSubDomain;
-typedef hpx::shared_future<LocalSubDomain> SubDomain_future;
 
-/******************************************************************************/
 
-struct LocalSubVector_STRUCT {
+/*******************VECTOR*****************************************************/
+
+// dummy ready future for non existing neighbors
+hpx::shared_future<double**> dummyNeighbor = hpx::make_ready_future<double**>(NULL);
+
+/*  TODO deleat
+// datastructur holding the futures of the data values for the Neigborhoud 
+struct Neighborhood_futuriced{
+    Neighborhood_futuriced(){
+    }
+
+    hpx::shared_future<double*>*** & get(){
+        return data;
+    }
+
+    shared_future<double*>& get(int const x, int const y, int const z){
+        asserte(x >=-1 && x<=1 && y >=-1 && y<=1 && z >=-1 && z<=1);
+        return data[x+1][y+1][z+1];
+    }
+
+    void set(int const x, int const y, int const z,
+             hpx::shared_future<double*> values){
+        asserte(x >=-1 && x<=1 && y >=-1 && y<=1 && z >=-1 && z<=1);
+
+        data[x+1][y+1][z+1] = values;
+    }
+
+private:
+    hpx::shared_future<double*>[3][3][3] data;
+};
+*/
+
+// subvector including data and geometry and meta informations
+struct SubVector{
+    // the lenth of the subvector
     local_int_t localLength;
-    double * values; 
+    
+    // pointer to the whol vector on the localety
+    double* localetyValues;
+
+    // future of the subvectorvalues (subvector points to localety values)
+    hpx::shared_future<double**> values_f;
+
+    // pointers too all sourunding fututres of subvectorvalues.
+    hpx::shared_future<double**>* neighbourhood[3][3][3];
 
 };
-typedef struct LocalSubVector_STRUCT LocalSubVector;
-typedef hpx::shared_future<LocalSubVector> SubVector_future;
 
-/******************************************************************************/
 
-struct LocalSubF2C_STRUCT {
-    local_int_t * f2cOperator;
+/*******************MG OPERATOR************************************************/
+
+struct SubF2COperator{
+    local_int_t** f2cOperator;
 };
-typedef struct LocalSubF2C_STRUCT LocalSubF2C;
-typedef hpx::shared_future<LocalSubF2C> SubF2C_future;
+typedef hpx::shared_future<SubF2COperator> SubF2C;
 
-/******************************************************************************/
 
+/*******************HELPER FUNKTIONS*******************************************/
+
+// calculating the 1D prozessor index out of the 3D index
 inline int index(int const lpix, int const lpiy, int const lpiz,
                  int const nlpx, int const nlpy, int const nlpz){
     return lpiz * (nlpx*nlpy) + lpiy * (nlpx) + lpix;
 }
 
-inline int index(LocalSubDomain const & A){
+// calculating the 1D prozessor index from a SubDomain
+inline int index(SubDomain const & A){
     return index(A.lpix, A.lpiy, A.lpiz, A.nlpx, A.nlpy, A.nlpz);
 }
 
 
+
+
+//TODO brauch ich das noch?
+/*
 struct Neighborhood{
     Neighborhood(){
         for (int i=0;i<27;++i)
@@ -114,31 +166,7 @@ struct Neighborhood{
     }
 
 private:
-    int [3][3][3] data;
-};
-
-struct Neighborhood_futuriced{
-    Neighborhood_futuriced(){
-    }
-
-    hpx::shared_future<double*>*** & get(){
-        return data;
-    }
-
-    shared_future<double*>& get(int const x, int const y, int const z){
-        asserte(x >=-1 && x<=1 && y >=-1 && y<=1 && z >=-1 && z<=1);
-        return data[x+1][y+1][z+1];
-    }
-
-    void set(int const x, int const y, int const z,
-             hpx::shared_future<double*> values){
-        asserte(x >=-1 && x<=1 && y >=-1 && y<=1 && z >=-1 && z<=1);
-
-        data[x+1][y+1][z+1] = values;
-    }
-
-private:
-    hpx::shared_future<double*>[3][3][3] data;
+    int data[3][3][3];
 };
 
 
@@ -172,9 +200,9 @@ Neighborhood getNeighbor(LocalSubDomain const & A){
 
     return neighborhod;
 }
+*/
 
-
-
+// Funtion to create Optimized Data
 int OptimizeProblem(SparseMatrix & A, CGData & data,  Vector & b, Vector & x, Vector & xexact);
 
 #endif  // NOT NO_HPX
