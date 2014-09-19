@@ -19,6 +19,7 @@
 #include "Vector.hpp"
 #include "CGData.hpp"
 #include <cassert>
+#include <vector>
 
 #ifndef HPCG_NOHPX
 
@@ -29,18 +30,17 @@
 
 // datastructure of Matrixvalues
 struct MatrixValues{
-    double ** values;
-    double ** diagonal;
-    global_int_t ** indG;   // Pointer to matrix indexi of the global domain TODO ???
-    local_int_t ** indLoc;  // Pointer to matrix indexi of the localyty domain
-    char * nonzerosInRow;
+    std::vector<double*> values;
+    std::vector<double*> diagonal;
+    std::vector<global_int_t*> indG;   // Pointer to matrix indexi of the global domain TODO ???
+    std::vector<local_int_t*> indLoc;  // Pointer to matrix indexi of the localyty domain
+    std::vector<char*> nonzerosInRow;
 };
 typedef hpx::shared_future<MatrixValues> MatrixValues_furure;
 
 
 // SubMatrix including values and geometic data
 struct SubDomain{
-    //TODO constant geo values out of future
     int nlpx;       // number of local sub process in x direction.
     int nlpy;       // number of local sub process in y direction.
     int nlpz;       // number of local sub process in z direction.
@@ -60,34 +60,8 @@ struct SubDomain{
 /*******************VECTOR*****************************************************/
 
 // dummy ready future for non existing neighbors
-hpx::shared_future<double**> dummyNeighbor = hpx::make_ready_future<double**>(NULL);
-
-/*  TODO deleat
-// datastructur holding the futures of the data values for the Neigborhoud 
-struct Neighborhood_futuriced{
-    Neighborhood_futuriced(){
-    }
-
-    hpx::shared_future<double*>*** & get(){
-        return data;
-    }
-
-    shared_future<double*>& get(int const x, int const y, int const z){
-        asserte(x >=-1 && x<=1 && y >=-1 && y<=1 && z >=-1 && z<=1);
-        return data[x+1][y+1][z+1];
-    }
-
-    void set(int const x, int const y, int const z,
-             hpx::shared_future<double*> values){
-        asserte(x >=-1 && x<=1 && y >=-1 && y<=1 && z >=-1 && z<=1);
-
-        data[x+1][y+1][z+1] = values;
-    }
-
-private:
-    hpx::shared_future<double*>[3][3][3] data;
-};
-*/
+static hpx::shared_future< std::vector<double*> > dummyNeighbor_f =
+    hpx::make_ready_future(std::vector<double*>() );
 
 // subvector including data and geometry and meta informations
 struct SubVector{
@@ -98,10 +72,10 @@ struct SubVector{
     double* localetyValues;
 
     // future of the subvectorvalues (subvector points to localety values)
-    hpx::shared_future<double**> values_f;
+    hpx::shared_future< std::vector<double*> > values_f;
 
     // pointers too all sourunding fututres of subvectorvalues.
-    hpx::shared_future<double**>* neighbourhood[3][3][3];
+    hpx::shared_future< std::vector<double*> >* neighbourhood[3][3][3];
 
 };
 
@@ -109,7 +83,7 @@ struct SubVector{
 /*******************MG OPERATOR************************************************/
 
 struct SubF2COperator{
-    local_int_t** f2cOperator;
+    std::vector<local_int_t*> f2cOperator;
 };
 typedef hpx::shared_future<SubF2COperator> SubF2C;
 
