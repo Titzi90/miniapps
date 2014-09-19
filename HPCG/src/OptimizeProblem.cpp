@@ -54,7 +54,6 @@ int OptimizeProblem(SparseMatrix & A,
     std::cerr << "start opti problem" << std::endl;
 #endif
 
-    //TODO CG DATA!!!
 
 // extract datas
 int const & nx = A.geom->nx;    // number points in x direction for the locality
@@ -76,20 +75,36 @@ int nlz  = NL;              // number of local points in z direction
 local_int_t localNumberRows = nlx*nly*nlz;
 
 // create an allocate Sub Domains
+A.optimizationData = new std::vector<SubDomain>();
 b.optimizationData = new std::vector<SubVector>();
 x.optimizationData = new std::vector<SubVector>();
-A.optimizationData = new std::vector<SubDomain>();
+data.r.optimizationData = new std::vector<SubVector>();
+data.z.optimizationData = new std::vector<SubVector>();
+data.p.optimizationData = new std::vector<SubVector>();
+data.Ap.optimizationData = new std::vector<SubVector>();
 
+std::vector<SubDomain> & subDomains=
+    *static_cast<std::vector<SubDomain>* >(A.optimizationData);
 std::vector<SubVector> & subBs=
     *static_cast<std::vector<SubVector>* >(b.optimizationData);
 std::vector<SubVector> & subXs=
     *static_cast<std::vector<SubVector>* >(x.optimizationData);
-std::vector<SubDomain> & subDomains=
-    *static_cast<std::vector<SubDomain>* >(A.optimizationData);
+std::vector<SubVector> & subRs=
+    *static_cast<std::vector<SubVector>* >(data.r.optimizationData);
+std::vector<SubVector> & subZs=
+    *static_cast<std::vector<SubVector>* >(data.z.optimizationData);
+std::vector<SubVector> & subPs=
+    *static_cast<std::vector<SubVector>* >(data.p.optimizationData);
+std::vector<SubVector> & subAps=
+    *static_cast<std::vector<SubVector>* >(data.Ap.optimizationData);
 
+subDomains.reserve(nlp);
 subBs.reserve(nlp);
 subXs.reserve(nlp);
-subDomains.reserve(nlp);
+subRs.reserve(nlp);
+subZs.reserve(nlp);
+subPs.reserve(nlp);
+subAps.reserve(nlp);
 
 //create subDomains for MultiGrid
 SparseMatrix& Acur = A;
@@ -147,9 +162,17 @@ for (int i=0; i<nlp; ++i){
     // .. for vector
     std::vector<double*> subBv;
     std::vector<double*> subXv;
+    std::vector<double*> subRv;
+    std::vector<double*> subZv;
+    std::vector<double*> subPv;
+    std::vector<double*> subApv;
 
     subBv.reserve(localNumberRows);
     subXv.reserve(localNumberRows);
+    subRv.reserve(localNumberRows);
+    subZv.reserve(localNumberRows);
+    subPv.reserve(localNumberRows);
+    subApv.reserve(localNumberRows);
 
     // compute pointers from SubMatrixes/SubVectors to local(ety) matrix/vectors
     for (local_int_t iz=0; iz<nlz; iz++) {
@@ -175,6 +198,10 @@ for (int i=0; i<nlp; ++i){
 
                 subBv[currentLocalSubRow] = &b.values[currentLocaletyRow];
                 subXv[currentLocalSubRow] = &x.values[currentLocaletyRow];
+                subRv[currentLocalSubRow] = &data.r.values[currentLocaletyRow];
+                subZv[currentLocalSubRow] = &data.z.values[currentLocaletyRow];
+                subPv[currentLocalSubRow] = &data.p.values[currentLocaletyRow];
+                subApv[currentLocalSubRow] =&data.Ap.values[currentLocaletyRow];
 
             }
         }
@@ -195,19 +222,39 @@ for (int i=0; i<nlp; ++i){
     // save values to vector
     SubVector subB;
     SubVector subX;
+    SubVector subR;
+    SubVector subZ;
+    SubVector subP;
+    SubVector subAp;
 
     subB.localLength = localNumberRows;
     subX.localLength = localNumberRows;
+    subR.localLength = localNumberRows;
+    subZ.localLength = localNumberRows;
+    subP.localLength = localNumberRows;
+    subAp.localLength = localNumberRows;
     subB.localetyValues = b.values;
     subX.localetyValues = x.values;
+    subR.localetyValues = data.r.values;
+    subZ.localetyValues = data.z.values;
+    subP.localetyValues = data.p.values;
+    subAp.localetyValues = data.Ap.values;
     subB.values_f = hpx::make_ready_future(std::move(subBv));
     subX.values_f = hpx::make_ready_future(std::move(subXv));
+    subR.values_f = hpx::make_ready_future(std::move(subRv));
+    subZ.values_f = hpx::make_ready_future(std::move(subZv));
+    subP.values_f = hpx::make_ready_future(std::move(subPv));
+    subAp.values_f = hpx::make_ready_future(std::move(subApv));
 
     //save in SubParts in Loacality Vector
     // TODO wenn map dann inert
+    subDomains.push_back( std::move(subDomain) );
     subBs.push_back( std::move(subB) );
     subXs.push_back( std::move(subX) );
-    subDomains.push_back( std::move(subDomain) );
+    subRs.push_back( std::move(subR) );
+    subZs.push_back( std::move(subZ) );
+    subPs.push_back( std::move(subP) );
+    subAps.push_back( std::move(subAp) );
 
 
     // go throu MG Levels
@@ -360,6 +407,14 @@ for (int x=0; x<nlpx; ++x){
                                 &dummyNeighbor_f;
                             subXs[i].neighbourhood[dx+1][dy+1][dz+1] =
                                 &dummyNeighbor_f;
+                            subRs[i].neighbourhood[dx+1][dy+1][dz+1] =
+                                &dummyNeighbor_f;
+                            subZs[i].neighbourhood[dx+1][dy+1][dz+1] =
+                                &dummyNeighbor_f;
+                            subPs[i].neighbourhood[dx+1][dy+1][dz+1] =
+                                &dummyNeighbor_f;
+                            subAps[i].neighbourhood[dx+1][dy+1][dz+1] =
+                                &dummyNeighbor_f;
 
                             // going throw MG
                             SparseMatrix& Acur = A;
@@ -385,6 +440,14 @@ for (int x=0; x<nlpx; ++x){
                                 &subBs[ii].values_f;
                             subXs[i].neighbourhood[dx+1][dy+1][dz+1] =
                                 &subXs[ii].values_f;
+                            subRs[i].neighbourhood[dx+1][dy+1][dz+1] =
+                                &subRs[ii].values_f;
+                            subZs[i].neighbourhood[dx+1][dy+1][dz+1] =
+                                &subZs[ii].values_f;
+                            subPs[i].neighbourhood[dx+1][dy+1][dz+1] =
+                                &subPs[ii].values_f;
+                            subAps[i].neighbourhood[dx+1][dy+1][dz+1] =
+                                &subAps[ii].values_f;
 
                             // going throw MG
                             SparseMatrix& Acur = A;
