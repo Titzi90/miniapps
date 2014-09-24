@@ -163,6 +163,7 @@ std::cout<<"using mpi"<<endl;
   times[7] = t7;
 #ifdef HPCG_DEBUG
   if (rank==0) HPCG_fout << "Total problem setup time in main (sec) = " << mytimer() - t1 << endl;
+  if (rank==0) HPCG_fout << "Optimization setuptime (sec) = " << times[7] << endl;
 #endif
 
 #ifdef HPCG_DETAILED_DEBUG

@@ -2,6 +2,42 @@
 #
 # Distributed under the Boost Software License, Version 1.0. (See accompanying
 # file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
+set(SOURCES_TEST
+    CG.cpp
+    CG_ref.cpp
+    TestCG.cpp
+    ComputeResidual.cpp
+    ExchangeHalo.cpp
+    GenerateGeometry.cpp
+    GenerateProblem.cpp
+    OptimizeProblem.cpp
+    ReadHpcgDat.cpp
+    ReportResults.cpp
+    SetupHalo.cpp
+    TestSymmetry.cpp
+    TestNorms.cpp
+    WriteProblem.cpp
+    YAML_Doc.cpp
+    YAML_Element.cpp
+    ComputeDotProduct.cpp
+    ComputeDotProduct_ref.cpp
+    mytimer.cpp
+    ComputeSPMV.cpp
+    ComputeSPMV_ref.cpp
+    ComputeSYMGS.cpp
+    ComputeSYMGS_ref.cpp
+    ComputeWAXPBY.cpp
+    ComputeWAXPBY_ref.cpp
+    ComputeMG.cpp
+    ComputeMG_ref.cpp
+    ComputeProlongation.cpp
+    ComputeProlongation_ref.cpp
+    ComputeRestriction.cpp
+    ComputeRestriction_ref.cpp
+    GenerateCoarseProblem.cpp
+    init.cpp
+    finalize.cpp
+    ../testing/test.cpp)
 set(SOURCES
     CG.cpp
     CG_ref.cpp
@@ -64,6 +100,11 @@ else()
           "${CMAKE_CXX_FLAGS_RELWITHDEBINFO} /Zc:inline")
     endif()
   endif()
+  add_hpx_executable(testing
+    MODULE hpcg
+    SOURCES ${SOURCES_TEST}
+    COMPONENT_DEPENDENCIES iostreams
+  )
   add_hpx_executable(hpcg
     MODULE hpcg
     SOURCES ${SOURCES}
