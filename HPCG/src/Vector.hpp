@@ -23,6 +23,8 @@
 #include <cassert>
 #include <cstdlib>
 #include "Geometry.hpp"
+#include <iostream>
+
 
 struct Vector_STRUCT {
   local_int_t localLength;  //!< length of local portion of the vector
@@ -92,6 +94,7 @@ inline void FillRandomVector(Vector & v) {
  */
 inline void CopyVector(const Vector & v, Vector & w) {
   local_int_t localLength = v.localLength;
+std::cerr << "v length="<< localLength << "w length" << w.localLength <<std::endl;
   assert(w.localLength >= localLength);
   double * vv = v.values;
   double * wv = w.values;

@@ -59,6 +59,8 @@ struct SubDomain{
 
 /*******************VECTOR*****************************************************/
 
+typedef hpx::shared_future< std::vector<double*> > VectorValues_future;
+
 // dummy ready future for non existing neighbors
 static hpx::shared_future< std::vector<double*> > dummyNeighbor_f =
     hpx::make_ready_future(std::vector<double*>() );
@@ -72,10 +74,25 @@ struct SubVector{
     double* localetyValues;
 
     // future of the subvectorvalues (subvector points to localety values)
-    hpx::shared_future< std::vector<double*> > values_f;
+    VectorValues_future values_f;
 
     // pointers too all sourunding fututres of subvectorvalues.
-    hpx::shared_future< std::vector<double*> >* neighbourhood[3][3][3];
+    // TODO in vector
+    VectorValues_future* neighbourhood[3][3][3];
+
+    std::vector<hpx::shared_future< std::vector<double*> > > getNeighbourhood() const {
+        std::vector<hpx::shared_future< std::vector<double*> > > neighbours;
+        neighbours.reserve(9);
+        for (int x=0; x<3; ++x){
+            for (int y=0; y<3; ++y){
+                for (int z=0; z<3; ++z){
+                    neighbours.push_back(*neighbourhood[x][y][z]);
+                }
+            }
+        }
+
+        return std::move(neighbours);
+    }
 
 };
 
@@ -90,7 +107,7 @@ typedef hpx::shared_future<SubF2COperator> SubF2C;
 
 /*******************HELPER FUNKTIONS*******************************************/
 
-// calculating the 1D prozessor index out of the 3D index
+// ca)culating the 1D prozessor index out of the 3D index
 inline int index(int const lpix, int const lpiy, int const lpiz,
                  int const nlpx, int const nlpy, int const nlpz){
     return lpiz * (nlpx*nlpy) + lpiy * (nlpx) + lpix;
@@ -101,7 +118,20 @@ inline int index(SubDomain const & A){
     return index(A.lpix, A.lpiy, A.lpiz, A.nlpx, A.nlpy, A.nlpz);
 }
 
+//wait untill SubDomain is ready
+inline hpx::future<std::vector<VectorValues_future> > when_vec(Vector v)
+{
+    std::vector<VectorValues_future> subVs_f;
+    
+    std::vector<SubVector>  & subVs =
+        *static_cast<std::vector<SubVector>* >(v.optimizationData);
+    for(size_t i=0; i<subVs.size(); ++i)
+    {
+        subVs_f.push_back(subVs.at(i).values_f);
+    }
 
+    return hpx::when_all(subVs_f);
+}
 
 
 //TODO brauch ich das noch?
