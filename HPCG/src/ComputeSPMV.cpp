@@ -40,7 +40,7 @@
 */
 #if defined(HPCG_NOHPX)
 
-int ComputeSPMV(  SparseMatrix & A, Vector & x, Vector & y) {
+int ComputeSPMV(const SparseMatrix & A, Vector & x, Vector & y) {
 
   // This line and the next two lines should be removed and your version of ComputeSPMV should be used.
   A.isSpmvOptimized = false;

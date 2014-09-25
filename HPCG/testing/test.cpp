@@ -153,6 +153,7 @@ if(0 == hpx::get_locality_id())
 
 
 /******************************************************************************/
+#ifndef HPCG_NOHPX
   std::cout << "we have " << size << " localitys with " 
             << params.numThreads << " hpx threads" <<std::endl;
 
@@ -197,6 +198,8 @@ std::cerr << "We have " << subBs.size() << " sub domains" << std::endl;
       HPX_ASSERT(values.size() == subBs[i].localLength);
   }
 
+#endif
+
 /******************************************************************************/
 // SPMV TEST
   std::cout << "starting SPMV test" <<std::endl;
@@ -205,6 +208,7 @@ std::cerr << "We have " << subBs.size() << " sub domains" << std::endl;
   ComputeSPMV_ref(A_ref, b_ref, x_ref);
   ref_time = mytimer() - ref_time;
 
+#ifndef HPCG_NOHPX
   double opt_time = mytimer();
   ComputeSPMV    (A   , b     , x    );
   hpx::wait_all(when_vec(x));
@@ -216,6 +220,12 @@ std::cerr << "We have " << subBs.size() << " sub domains" << std::endl;
   }
   std::cout << "SPMV test ok!\n";
   std::cout << "ref_time was " <<ref_time << " opt_time was " << opt_time <<std::endl;
+#else
+
+  std::cout << "SPMV toks " <<ref_time << std::endl;
+
+#endif
+
 
 
 #ifdef HPCG_DETAILED_DEBUG

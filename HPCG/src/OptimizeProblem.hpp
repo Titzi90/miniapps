@@ -209,5 +209,8 @@ Neighborhood getNeighbor(LocalSubDomain const & A){
 // Funtion to create Optimized Data
 int OptimizeProblem(SparseMatrix & A, CGData & data,  Vector & b, Vector & x, Vector & xexact);
 
+#else
+// dummy function
+int OptimizeProblem(SparseMatrix & A, CGData & data,  Vector & b, Vector & x, Vector & xexact);
 #endif  // NOT NO_HPX
 #endif  // OPTIMIZEPROBLEM_HPP

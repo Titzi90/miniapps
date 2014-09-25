@@ -78,7 +78,11 @@ set(SOURCES
 include_directories(".")
 
 if(HPCG_NOHPX)
+  add_executable(testing ${SOURCES_TEST})
   add_executable(hpcg ${SOURCES})
+  install(TARGETS hpcg testing
+            RUNTIME DESTINATION bin
+        )
   set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++0x")
   if(NOT HPCG_NOMPI)
      target_link_libraries(hpcg ${MPI_LIBRARIES})
