@@ -59,10 +59,15 @@ int main(int argc, char * argv[]) {
 #ifndef HPCG_NOHPX
 if(0 == hpx::get_locality_id())
 {
-  std::cout<<"Using HPX"<<endl;
+  std::cout<<"Using HPX"<<std::endl;
 }
 #endif
-
+#ifndef HPCG_NOOPENMP
+  std::cout<<"Using OMP"<<std::endl;
+#endif
+#ifndef HPCG_NOMPI
+  std::cout<<"Using MPI"<<std::endl;
+#endif
 
   HPCG_Params params;
 
@@ -210,6 +215,7 @@ std::cerr << "We have " << subBs.size() << " sub domains" << std::endl;
 
 #ifndef HPCG_NOHPX
   double opt_time = mytimer();
+  hpx::reset_active_counters();
   ComputeSPMV    (A   , b     , x    );
   hpx::wait_all(when_vec(x));
   opt_time = mytimer() - opt_time;
