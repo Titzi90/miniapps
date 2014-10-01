@@ -42,7 +42,7 @@
 
   @see ComputeDotProduct_ref
 */
-#if defined(HPCG_NOHPX)
+//#if defined(HPCG_NOHPX)
 
 int ComputeDotProduct(const local_int_t n, const Vector & x, const Vector & y,
     double & result, double & time_allreduce, bool & isOptimized) {
@@ -52,52 +52,52 @@ int ComputeDotProduct(const local_int_t n, const Vector & x, const Vector & y,
   return(ComputeDotProduct_ref(n, x, y, result, time_allreduce));
 }
 
-#else
+//#else
 
-#include <hpx/include/lcos.hpp>
-#include <hpx/include/parallel_transform_reduce.hpp>
+//#include <hpx/include/lcos.hpp>
+//#include <hpx/include/parallel_transform_reduce.hpp>
 
-#include <boost/iterator/counting_iterator.hpp>
+//#include <boost/iterator/counting_iterator.hpp>
 
-hpx::future<double> ComputeDotProduct_async(
-    const local_int_t n, const Vector & x, const Vector & y,
-    double & time_allreduce) {
+//hpx::future<double> ComputeDotProduct_async(
+    //const local_int_t n, const Vector & x, const Vector & y,
+    //double & time_allreduce) {
 
-  assert(x.localLength>=n); // Test vector lengths
-  assert(y.localLength>=n);
+  //assert(x.localLength>=n); // Test vector lengths
+  //assert(y.localLength>=n);
 
-  double * xv = x.values;
-  double * yv = y.values;
+  //double * xv = x.values;
+  //double * yv = y.values;
 
-  typedef boost::counting_iterator<local_int_t> iterator;
+  //typedef boost::counting_iterator<local_int_t> iterator;
 
-  if (yv == xv) {
-    return
-      hpx::parallel::transform_reduce(
-          hpx::parallel::task, iterator(0), iterator(n), 0.0,
-          std::plus<double>(),
-          [xv](local_int_t i)
-          {
-              return xv[i] * xv[i];
-          });
-  }
+  //if (yv == xv) {
+    //return
+      //hpx::parallel::transform_reduce(
+          //hpx::parallel::task, iterator(0), iterator(n), 0.0,
+          //std::plus<double>(),
+          //[xv](local_int_t i)
+          //{
+              //return xv[i] * xv[i];
+          //});
+  //}
 
-  return
-    hpx::parallel::transform_reduce(
-      hpx::parallel::task, iterator(0), iterator(n), 0.0,
-      std::plus<double>(),
-      [xv, yv](local_int_t i)
-      {
-          return xv[i] * yv[i];
-      });
-}
+  //return
+    //hpx::parallel::transform_reduce(
+      //hpx::parallel::task, iterator(0), iterator(n), 0.0,
+      //std::plus<double>(),
+      //[xv, yv](local_int_t i)
+      //{
+          //return xv[i] * yv[i];
+      //});
+//}
 
-int ComputeDotProduct(const local_int_t n, const Vector & x, const Vector & y,
-    double & result, double & time_allreduce, bool & isOptimized) {
+//int ComputeDotProduct(const local_int_t n, const Vector & x, const Vector & y,
+    //double & result, double & time_allreduce, bool & isOptimized) {
 
-  isOptimized = true;
-  result = ComputeDotProduct_async(n, x, y, time_allreduce).get();
-  return 0;
-}
+  //isOptimized = true;
+  //result = ComputeDotProduct_async(n, x, y, time_allreduce).get();
+  //return 0;
+//}
 
-#endif
+//#endif

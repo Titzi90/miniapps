@@ -41,13 +41,14 @@
 
   @return Returns zero on success and a non-zero value otherwise.
 */
-#if defined(HPCG_NOHPX)
+//#if defined(HPCG_NOHPX)
 
 int ComputeRestriction(const SparseMatrix & A, const Vector & rf) {
 
   return ComputeRestriction_ref(A, rf);
 }
 
+/*
 #else
 
 #include <hpx/include/lcos.hpp>
@@ -79,3 +80,4 @@ int ComputeRestriction(const SparseMatrix & A, const Vector & rf) {
 }
 
 #endif
+*/

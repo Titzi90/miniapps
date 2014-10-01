@@ -43,7 +43,7 @@
 
   @see ComputeWAXPBY_ref
 */
-#if defined(HPCG_NOHPX)
+//#if defined(HPCG_NOHPX)
 
 int ComputeWAXPBY(const local_int_t n, const double alpha, const Vector & x,
     const double beta, const Vector & y, Vector & w, bool & isOptimized) {
@@ -53,6 +53,7 @@ int ComputeWAXPBY(const local_int_t n, const double alpha, const Vector & x,
   return(ComputeWAXPBY_ref(n, alpha, x, beta, y, w));
 }
 
+/*
 #else
 
 #include <hpx/include/lcos.hpp>
@@ -107,3 +108,4 @@ int ComputeWAXPBY(const local_int_t n, const double alpha, const Vector & x,
 }
 
 #endif
+*/

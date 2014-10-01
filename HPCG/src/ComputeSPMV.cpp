@@ -61,34 +61,34 @@ int ComputeSPMV(const SparseMatrix & A, Vector & x, Vector & y) {
 #include <boost/iterator/counting_iterator.hpp>
 
 
-hpx::future<void> ComputeSPMV_async( const SparseMatrix & A, /*const*/ Vector & x, Vector & y) {
+//hpx::future<void> ComputeSPMV_async( const SparseMatrix & A, [>const<] Vector & x, Vector & y) {
 
-  assert(x.localLength>=A.localNumberOfColumns); // Test vector lengths
-  assert(y.localLength>=A.localNumberOfRows);
+  //assert(x.localLength>=A.localNumberOfColumns); // Test vector lengths
+  //assert(y.localLength>=A.localNumberOfRows);
 
-#ifndef HPCG_NOMPI
-    ExchangeHalo(A,x);
-#endif
+//#ifndef HPCG_NOMPI
+    //ExchangeHalo(A,x);
+//#endif
 
-  const double * const xv = x.values;
-  double * const yv = y.values;
-  const local_int_t nrow = A.localNumberOfRows;
+  //const double * const xv = x.values;
+  //double * const yv = y.values;
+  //const local_int_t nrow = A.localNumberOfRows;
 
-  typedef boost::counting_iterator<local_int_t> iterator;
+  //typedef boost::counting_iterator<local_int_t> iterator;
 
-  return hpx::parallel::for_each(
-    hpx::parallel::task, iterator(0), iterator(nrow),
-    [xv, yv, &A](local_int_t i) {
-      double sum = 0.0;
-      const double * const cur_vals = A.matrixValues[i];
-      const local_int_t * const cur_inds = A.mtxIndL[i];
-      const int cur_nnz = A.nonzerosInRow[i];
+  //return hpx::parallel::for_each(
+    //hpx::parallel::task, iterator(0), iterator(nrow),
+    //[xv, yv, &A](local_int_t i) {
+      //double sum = 0.0;
+      //const double * const cur_vals = A.matrixValues[i];
+      //const local_int_t * const cur_inds = A.mtxIndL[i];
+      //const int cur_nnz = A.nonzerosInRow[i];
 
-      for (int j=0; j< cur_nnz; j++)
-        sum += cur_vals[j]*xv[cur_inds[j]];
-      yv[i] = sum;
-    });
-}
+      //for (int j=0; j< cur_nnz; j++)
+        //sum += cur_vals[j]*xv[cur_inds[j]];
+      //yv[i] = sum;
+    //});
+//}
 
 /******************************************************************************/
 

@@ -40,13 +40,14 @@
 
   @return Returns zero on success and a non-zero value otherwise.
 */
-#if defined(HPCG_NOHPX)
+//#if defined(HPCG_NOHPX)
 
 int ComputeProlongation(const SparseMatrix & Af, Vector & xf) {
 
   return ComputeProlongation_ref(Af, xf);
 }
 
+/*
 #else
 
 #include <hpx/include/lcos.hpp>
@@ -78,3 +79,4 @@ int ComputeProlongation(const SparseMatrix & Af, Vector & xf) {
 }
 
 #endif
+*/
