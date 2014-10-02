@@ -154,7 +154,7 @@ hpx::future<std::vector<double*> > asyncMul(MatrixValues_furure& mtx_f,
     return hpx::when_all(mtx_f,
                          hpx::when_all(vec.getNeighbourhood()),
                          res_f
-                        ).then(unwrapper);
+                        ).then(hpx::launch::async, unwrapper);
 }
 
 
