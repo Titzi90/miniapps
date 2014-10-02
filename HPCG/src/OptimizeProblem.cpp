@@ -37,6 +37,9 @@
   @see GenerateGeometry
   @see GenerateProblem
 */
+
+int const NL = 16;//number of local points in each direction
+
 int OptimizeProblem(SparseMatrix & A,
                     CGData & data,
                     Vector & b,
@@ -63,7 +66,6 @@ int const nz = A.geom->nz;    // number points in z direction for the locality
 // calc local subdomain geometry
 // we need at least 16 points in each direction for MG
 // TODO make it more dynamic
-int const NL = 16;  //number of local points in each direction
 assert(nx%NL == 0 && ny%NL == 0 && nz%NL == 0);
 int nlpx = nx / NL;         // number of local sub prozessors in x direction.
 int nlpy = ny / NL;         // number of local sub prozessors in y direction.
