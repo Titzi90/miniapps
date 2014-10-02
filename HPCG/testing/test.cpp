@@ -20,6 +20,7 @@
 #include <hpx/hpx_main.hpp>
 #include <hpx/include/iostreams.hpp>
 #include <hpx/util/assert.hpp>
+#include <hpx/performance_counters/performance_counter.hpp>
 #endif
 
 #include "hpcg.hpp"
@@ -59,7 +60,7 @@ int main(int argc, char * argv[]) {
 #ifndef HPCG_NOHPX
 if(0 == hpx::get_locality_id())
 {
-  std::cout<<"Using HPX"<<std::endl;
+  hpx::cout<<"Using HPX"<<hpx::endl;
 }
 #endif
 #ifndef HPCG_NOOPENMP
@@ -150,7 +151,9 @@ if(0 == hpx::get_locality_id())
   double t7 = mytimer(); OptimizeProblem(A, data, b, x, xexact); t7 = mytimer() - t7;
   times[7] = t7;
 
-  std::cout << "init optmization taks " << times[7] << std::endl;
+#ifndef HPCG_NOHPX
+  hpx::cout << "init optmization taks " << times[7] << hpx::endl;
+#endif
 #ifdef HPCG_DEBUG
   if (rank==0) HPCG_fout << "Total problem setup time in main (sec) = " << mytimer() - t1 << endl;
   if (rank==0) HPCG_fout << "Optimization setuptime (sec) = " << times[7] << endl;
@@ -159,11 +162,11 @@ if(0 == hpx::get_locality_id())
 
 /******************************************************************************/
 #ifndef HPCG_NOHPX
-  std::cout << "we have " << size << " localitys with " 
-            << params.numThreads << " hpx threads" <<std::endl;
+  hpx::cout << "we have " << size << " localitys with " 
+            << params.numThreads << " hpx threads" <<hpx::endl;
 
 
-  std::cout << "startin init test..." << std::endl;
+  hpx::cout << "startin init test..." << hpx::endl;
 // compare data (ohne MG data)
   HPX_ASSERT(b_ref.localLength == b.localLength);
   HPX_ASSERT(x_ref.localLength == x.localLength);
@@ -191,12 +194,12 @@ if(0 == hpx::get_locality_id())
         HPX_ASSERT(A_ref.mtxIndL[i][j] == A.mtxIndL[i][j]);
     }
   }
-  std::cout << "init test ok!" <<std::endl;
+  hpx::cout << "init test ok!" <<hpx::endl;
 
 //TODO optidata wirklich richti
   std::vector<SubVector>  & subBs =
         *static_cast<std::vector<SubVector>* >(x.optimizationData);
-std::cerr << "We have " << subBs.size() << " sub domains" << std::endl;
+hpx::cerr << "We have " << subBs.size() << " sub domains" << hpx::endl;
   for(size_t i=0; i<subBs.size(); ++i){
       VectorValues_future values_f = subBs[i].values_f;
       std::vector<double*> values = values_f.get();
@@ -214,18 +217,24 @@ std::cerr << "We have " << subBs.size() << " sub domains" << std::endl;
   ref_time = mytimer() - ref_time;
 
 #ifndef HPCG_NOHPX
+  //define and reset counter
+  hpx::performance_counters::performance_counter idle_rate (
+          "/threads{localiti#0/total}/idle-rate");
+  hpx::cout << "idle rate befor reset: " << idle_rate.get_value_sync<int>() << hpx::endl;
+  //idle_rate.reset_sync();
+  hpx::cout << "idle rate aftr reset: " << idle_rate.get_value_sync<int>() << hpx::endl;
   double opt_time = mytimer();
-  hpx::reset_active_counters();
   ComputeSPMV    (A   , b     , x    );
   hpx::wait_all(when_vec(x));
   opt_time = mytimer() - opt_time;
-
+  hpx::cout << "idle rate: " << idle_rate.get_value_sync<int>() << hpx::endl;
+  
   //varivate data
   for (local_int_t i=0; i<x.localLength; ++i){
     HPX_ASSERT(x_ref.values[i] == x.values[i]);
   }
-  std::cout << "SPMV test ok!\n";
-  std::cout << "ref_time was " <<ref_time << " opt_time was " << opt_time <<std::endl;
+  hpx::cout << "SPMV test ok!\n";
+  hpx::cout << "ref_time was " <<ref_time << " opt_time was " << opt_time <<hpx::endl;
 #else
 
   std::cout << "SPMV toks " <<ref_time << std::endl;
@@ -235,18 +244,8 @@ std::cerr << "We have " << subBs.size() << " sub domains" << std::endl;
 
 
 #ifdef HPCG_DETAILED_DEBUG
-  if (geom->size == 1) WriteProblem(*geom, A, b, x, xexact);
+  //if (geom->size == 1) WriteProblem(*geom, A, b, x, xexact);
 #endif
-
-
-
-
-
-
-
-
-
-
 
 
 
