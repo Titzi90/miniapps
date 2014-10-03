@@ -221,8 +221,8 @@ hpx::cerr << "We have " << subBs.size() << " sub domains" << hpx::endl;
   hpx::performance_counters::performance_counter idle_rate (
           "/threads{localiti#0/total}/idle-rate");
   hpx::cout << "idle rate befor reset: " << idle_rate.get_value_sync<int>() << hpx::endl;
-  //idle_rate.reset_sync();
-  hpx::cout << "idle rate aftr reset: " << idle_rate.get_value_sync<int>() << hpx::endl;
+  idle_rate.reset_sync();
+  hpx::cout << "idle rate after reset: " << idle_rate.get_value_sync<int>() << hpx::endl;
   double opt_time = mytimer();
   ComputeSPMV    (A   , b     , x    );
   hpx::wait_all(when_vec(x));
