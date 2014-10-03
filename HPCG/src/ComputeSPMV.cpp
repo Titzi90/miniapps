@@ -130,31 +130,23 @@ hpx::future<std::vector<double*> > asyncMul(MatrixValues_furure& mtx_f,
                                             SubVector& vec,
                                             VectorValues_future& res_f)
 {
-    //helperfuntion unwraping wait construct and calling mul function
-    //hpx::util::bind(<func>, <parameterliste inc. placeholder>)
-    auto unwrapper =
-        hpx::util::bind([](double const * vecVal,
-                           hpx::future<hpx::util::tuple<
-                               MatrixValues_furure,
-                               hpx::future<std::vector<VectorValues_future> >,
-                               VectorValues_future
-                           > > arg_f)
-                          -> std::vector<double*>
-                          {
-                            auto arg = arg_f.get();
-                            return subMul(hpx::util::get<0>(arg).get(),
-                                          vecVal,
-                                          hpx::util::get<2>(arg).get());
-                          },
-                        vec.localetyValues,
-                        hpx::util::placeholders::_1
-                       );
 
-    //wait for all dependencis and then call the unwrapper
-    return hpx::when_all(mtx_f,
-                         hpx::when_all(vec.getNeighbourhood()),
-                         res_f
-                        ).then(hpx::launch::async, unwrapper);
+    auto unwrapper = [vec](MatrixValues_furure mtx_f,
+                         std::vector<hpx::shared_future<std::vector<double*> > >,
+                         VectorValues_future res_f
+                         )
+                    {
+                        return subMul(mtx_f.get(),
+                                      vec.localetyValues,
+                                      res_f.get()
+                                     );
+                    };
+
+    return hpx::lcos::local::dataflow(
+                hpx::launch::async, unwrapper,
+                mtx_f, vec.getNeighbourhood(), res_f
+            );
+
 }
 
 
@@ -174,6 +166,7 @@ int ComputeSPMV_sub_async(SparseMatrix const & A, Vector  & x, Vector& y )
       *static_cast<std::vector<SubVector>* >(y.optimizationData);
 
   // loop over all subdomains
+  // TODO foreach
     for(size_t i=0; i<subYs.size(); ++i)
     {
         SubVector  & subY = subYs.at(i);
