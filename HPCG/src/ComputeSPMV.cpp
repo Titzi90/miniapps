@@ -183,11 +183,6 @@ int ComputeSPMV_sub_async(SparseMatrix const & A, Vector  & x, Vector& y )
   return 0;
 }
 
-
-
-
-
-
 int ComputeSPMV(const  SparseMatrix & A, Vector & x, Vector & y) {
   assert(x.localLength>=A.localNumberOfColumns); // Test vector lengths
   assert(y.localLength>=A.localNumberOfRows);

@@ -47,12 +47,21 @@
 #include "TestSymmetry.hpp"
 #include "TestNorms.hpp"
 
+
+#ifndef HPCG_NOHPX
+#define _cout_ hpx::cout
+#define _cerr_ hpx::cerr
+#define _endl_ hpx::endl
+#else
+#define _cout_ std::cout
+#define _cerr_ std::cerr
+#define _endl_ std::endl
+#endif
+
 #ifdef HPCG_DETAILED_DEBUG
 using std::cin;
 #endif
-using std::endl;
-
-
+using _endl_;
 
 int main(int argc, char * argv[]) {
 
@@ -60,14 +69,14 @@ int main(int argc, char * argv[]) {
 #ifndef HPCG_NOHPX
 if(0 == hpx::get_locality_id())
 {
-  hpx::cerr<<"Using HPX"<<hpx::endl;
+  _cerr_<<"Using HPX"<<_endl_;
 }
 #endif
 #ifndef HPCG_NOOPENMP
-  std::cerr<<"Using OMP"<<std::endl;
+  _cerr_<<"Using OMP"<<_endl_;
 #endif
 #ifndef HPCG_NOMPI
-  std::cerr<<"Using MPI"<<std::endl;
+  _cerr_<<"Using MPI"<<_endl_;
 #endif
 
   HPCG_Params params;
@@ -84,7 +93,7 @@ if(0 == hpx::get_locality_id())
   /*
   if (rank==0) {
     char c;
-    std::cout << "Press key to continue"<< std::endl;
+    _cout_ << "Press key to continue"<< _endl_;
     std::cin.get(c);
   }
   */
@@ -153,20 +162,20 @@ if(0 == hpx::get_locality_id())
 
 #ifdef HPCG_DEBUG
   if (rank==0) HPCG_fout << "Total problem setup time in main (sec) = " << mytimer() - t1 << endl;
-  if (rank==0) std::cerr << "Total problem setup time in main (sec) = " << mytimer() - t1 << endl;
+  if (rank==0) _cerr_ << "Total problem setup time in main (sec) = " << mytimer() - t1 << endl;
   if (rank==0) HPCG_fout << "Optimization setuptime (sec) = " << times[7] << endl;
-  if (rank==0) std::cerr << "Optimization setuptime (sec) = " << times[7] << endl;
+  if (rank==0) _cerr_ << "Optimization setuptime (sec) = " << times[7] << endl;
 #endif
 
 
 /******************************************************************************/
 #ifndef HPCG_NOHPX
-  hpx::cerr << "we have " << size << " localitys with " 
-            << params.numThreads << " hpx threads" <<hpx::endl;
+  _cerr_ << "we have " << size << " localitys with " 
+            << params.numThreads << " hpx threads" <<_endl_;
 
 
 #ifdef HPCG_DEBUG
-  hpx::cerr << "startin init test..." << hpx::endl;
+  _cerr_ << "startin init test..." << _endl_;
 // compare data (ohne MG data)
   HPX_ASSERT(b_ref.localLength == b.localLength);
   HPX_ASSERT(x_ref.localLength == x.localLength);
@@ -194,12 +203,12 @@ if(0 == hpx::get_locality_id())
         HPX_ASSERT(A_ref.mtxIndL[i][j] == A.mtxIndL[i][j]);
     }
   }
-  hpx::cerr << "init test ok!" <<hpx::endl;
+  _cerr_ << "init test ok!" <<_endl_;
 #endif
 
   std::vector<SubVector>  & subBs =
         *static_cast<std::vector<SubVector>* >(x.optimizationData);
-hpx::cerr << "We have " << subBs.size() << " sub domains" << hpx::endl;
+_cerr_ << "We have " << subBs.size() << " sub domains" << _endl_;
 #ifdef HPCG_DEBUG
   for(size_t i=0; i<subBs.size(); ++i){
       VectorValues_future values_f = subBs[i].values_f;
@@ -212,41 +221,145 @@ hpx::cerr << "We have " << subBs.size() << " sub domains" << hpx::endl;
 
 /******************************************************************************/
 // SPMV TEST
-  std::cerr << "starting SPMV test" <<std::endl;
-  //reverence
-  double ref_time = mytimer();
-  ComputeSPMV_ref(A_ref, b_ref, x_ref);
-  ref_time = mytimer() - ref_time;
-
-#ifndef HPCG_NOHPX
-  //define and reset counter
-  hpx::performance_counters::performance_counter idle_rate (
-          "/threads{localiti#0/total}/idle-rate");
-  hpx::performance_counters::performance_counter thread_counter (
-          "/threads{localiti#0/total}/count/cumulative");
-  idle_rate.reset_sync();
-  thread_counter.reset_sync();
-  double opt_time = mytimer();
-  ComputeSPMV    (A   , b     , x    );
-  hpx::wait_all(when_vec(x));
-  opt_time = mytimer() - opt_time;
-  hpx::cout << "idle rate: " << 0.01 * idle_rate.get_value_sync<int>() << "%"<< hpx::endl;
-  hpx::cout << thread_counter.get_value_sync<int>() << " number of hpx threads"<< hpx::endl;
-  
 #ifdef HPCG_DEBUG
+#ifndef HPCG_NOHPX
+  _cerr_ << "starting SPMV test" <<_endl_;
+  // reverence
+  ComputeSPMV_ref(A_ref, b_ref, x_ref);
+
+  // optimiced
+  ComputeSPMV    (A   , b     , x    );
+
   //varivate data
   for (local_int_t i=0; i<x.localLength; ++i){
     HPX_ASSERT(x_ref.values[i] == x.values[i]);
   }
-  hpx::cerr << "SPMV test ok!\n";
+  _cerr_ << "SPMV test ok!\n";
 #endif
-  hpx::cout << "ref_time was " <<ref_time << " opt_time was " << opt_time <<hpx::endl;
-
-#else
-
-  std::cout << "SPMV toks " <<ref_time << std::endl;
-
 #endif
+
+/******************************************************************************/
+// SPMV Benchmark
+// no dependencis 
+  {
+  _cerr_ << "starting SPMV benchmark with no dependencis" <<_endl_;
+
+  // recerence
+  int repeat_ref = 4;
+  double ref_time = 0;
+  for (; ref_time<1; repeat_ref*=2){
+    ref_time = mytimer();
+    for(int r=0; r<repeat_ref; ++r){
+      ComputeSPMV_ref(A_ref, b_ref, x_ref);
+    }
+    ref_time = mytimer() - ref_time;
+  }
+  repeat_ref /= 2;
+  ref_time /= repeat_ref;
+  _cout_ << ref_time << " sec. average (saple size: " << repeat_ref
+            << ") non optimized runtime" << _endl_;
+
+  //optimized version
+#ifndef HPCG_NOHPX
+  // define hpx countesrs and timer
+  int repeat_opt = 4;
+  double opt_time = 0;
+  hpx::performance_counters::performance_counter idleRate_counter (
+          "/threads{localiti#0/total}/idle-rate");
+  hpx::performance_counters::performance_counter thread_counter (
+          "/threads{localiti#0/total}/count/cumulative");
+  int idleRate =0;
+  int threads =0;
+  double thread_time =0.;
+
+  for (; opt_time<1; repeat_opt*=2){
+    idleRate_counter.reset_sync();
+    thread_counter.reset_sync();
+    opt_time =mytimer();
+    for(int r=0; r<repeat_opt; ++r){
+      ComputeSPMV    (A   , b     , x    );
+      hpx::wait_all(when_vec(x));
+    }
+    opt_time = mytimer() - opt_time;
+    idleRate = idleRate_counter.get_value_sync<int>();
+    threads   = thread_counter.get_value_sync<int>();
+  }
+  repeat_opt /= 2;
+  thread_time = 1000. * opt_time/threads;
+  opt_time /= repeat_opt;
+  _cout_ << opt_time << " sec. average (saple size: " << repeat_opt
+            << ") optimized hpx runtime (inc. barriers)" << _endl_;
+  _cout_ << 0.01 * idleRate << "% total idle rate"   << _endl_;
+  _cout_ << threads << " total number of hpx threads" << _endl_;
+  _cout_ << thread_time << " ms work per thread" << _endl_;
+  
+#endif
+  }
+
+// one dependencis 
+  {
+  _cerr_ << "starting SPMV benchmark with one dependenci" <<_endl_;
+
+  // recerence
+  int repeat_ref = 4;
+  double ref_time = 0;
+  for (; ref_time<1; repeat_ref*=2){
+    ref_time = mytimer();
+    for(int r=0; r<repeat_ref; ++r){
+      ComputeSPMV_ref(A_ref, b_ref, x_ref);
+    }
+    ref_time = mytimer() - ref_time;
+  }
+  repeat_ref /= 2;
+  ref_time /= repeat_ref;
+  _cout_ << ref_time << " sec. average (saple size: " << repeat_ref
+            << ") non optimized runtime" << _endl_;
+
+  //optimized version
+#ifndef HPCG_NOHPX
+  // define hpx countesrs and timer
+  int repeat_opt = 4;
+  double opt_time = 0;
+  hpx::performance_counters::performance_counter idleRate_counter (
+          "/threads{localiti#0/total}/idle-rate");
+  hpx::performance_counters::performance_counter thread_counter (
+          "/threads{localiti#0/total}/count/cumulative");
+  int idleRate =0;
+  int threads =0;
+  double thread_time =0.;
+
+  for (; opt_time<1; repeat_opt*=2){
+    idleRate_counter.reset_sync();
+    thread_counter.reset_sync();
+    opt_time =mytimer();
+    for(int r=0; r<repeat_opt; ++r){
+      ComputeSPMV    (A   , b     , x    );
+    }
+    hpx::wait_all(when_vec(x));
+    opt_time = mytimer() - opt_time;
+    idleRate = idleRate_counter.get_value_sync<int>();
+    threads   = thread_counter.get_value_sync<int>();
+  }
+  repeat_opt /= 2;
+  thread_time = 1000. * opt_time/threads;
+  opt_time /= repeat_opt;
+  _cout_ << opt_time << " sec. average (saple size: " << repeat_opt
+            << ") optimized hpx runtime (with no barriers)" << _endl_;
+  _cout_ << 0.01 * idleRate << "% total idle rate"   << _endl_;
+  _cout_ << threads << " total number of hpx threads" << _endl_;
+  _cout_ << thread_time << " ms work per thread" << _endl_;
+  
+#endif
+  }
+
+
+
+
+
+
+
+
+
 
 
 
