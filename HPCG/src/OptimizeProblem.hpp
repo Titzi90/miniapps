@@ -23,6 +23,7 @@
 
 #ifndef HPCG_NOHPX
 
+#include <algorithm>
 #include <hpx/hpx.hpp>
 
 
@@ -61,12 +62,14 @@ struct SubDomain{
 
 typedef hpx::shared_future< std::vector<double*> > VectorValues_future;
 
-// dummy ready future for non existing neighbors
-static hpx::shared_future< std::vector<double*> > dummyNeighbor_f =
-    hpx::make_ready_future(std::vector<double*>() );
-
 // subvector including data and geometry and meta informations
 struct SubVector{
+    // standard constructor
+    SubVector (){}
+    // Constructor creating dummy
+    SubVector (VectorValues_future vecVal)
+        :localLength(-1), localetyValues(0), values_f(vecVal), colorIndex(-1) {}
+
     // the lenth of the subvector
     local_int_t localLength;
     
@@ -76,17 +79,28 @@ struct SubVector{
     // future of the subvectorvalues (subvector points to localety values)
     VectorValues_future values_f;
 
-    // pointers too all sourunding fututres of subvectorvalues.
-    // TODO in vector
-    VectorValues_future* neighbourhood[3][3][3];
+    // colorindex for the multicolor Gaus-Seidel
+    int colorIndex;     //TODO löschen
 
-    std::vector<hpx::shared_future< std::vector<double*> > > getNeighbourhood() const {
-        std::vector<hpx::shared_future< std::vector<double*> > > neighbours;
-        neighbours.reserve(9);
+    // pointers too all sourunding fututres of subvectorvalues.
+    SubVector* neighbourhood[3][3][3];
+
+    inline std::vector< VectorValues_future > getNeighbourhood()
+    {
+        return getNeighbourhood(9);
+    }
+
+    // returening all neigbours less then colorLevel
+    inline std::vector<VectorValues_future> getNeighbourhood(int const colorLevel)
+    {
+        std::vector< VectorValues_future > neighbours;
+        neighbours.reserve(27);
         for (int x=0; x<3; ++x){
             for (int y=0; y<3; ++y){
                 for (int z=0; z<3; ++z){
-                    neighbours.push_back(*neighbourhood[x][y][z]);
+                    if (neighbourhood[x][y][z]->colorIndex < colorLevel){
+                        neighbours.push_back(neighbourhood[x][y][z]->values_f);
+                    }
                 }
             }
         }
@@ -95,6 +109,9 @@ struct SubVector{
     }
 
 };
+
+// dummy ready future for non existing neighbors
+static SubVector dummyNeighbor(hpx::make_ready_future(std::vector<double*>() ) );
 
 
 /*******************MG OPERATOR************************************************/

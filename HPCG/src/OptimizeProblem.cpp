@@ -241,6 +241,87 @@ for (int i=0; i<nlp; ++i){
     subP.values_f = hpx::make_ready_future(std::move(subPv));
     subAp.values_f = hpx::make_ready_future(std::move(subApv));
 
+    //calucalting and set color level
+    subB.colorIndex = 4 * lpiz%2 + 2 * lpiy%2 + 1 * lpix%2;
+    /*
+    if (lpiz%2 == 0){
+        if (lpiy%2 == 0){
+            if (lpix%2 == 0){
+                subB.colorIndex  = 0;
+                subX.colorIndex  = 0;
+                subR.colorIndex  = 0;
+                subZ.colorIndex  = 0;
+                subP.colorIndex  = 0;
+                subAp.colorIndex = 0;
+            }
+            else{
+                subB.colorIndex  = 1;
+                subX.colorIndex  = 1;
+                subR.colorIndex  = 1;
+                subZ.colorIndex  = 1;
+                subP.colorIndex  = 1;
+                subAp.colorIndex = 1;
+            }
+        }
+        else{
+            if (lpix%2 == 0){
+                subB.colorIndex  = 2;
+                subX.colorIndex  = 2;
+                subR.colorIndex  = 2;
+                subZ.colorIndex  = 2;
+                subP.colorIndex  = 2;
+                subAp.colorIndex = 2;
+            }
+            else{
+                subB.colorIndex  = 3;
+                subX.colorIndex  = 3;
+                subR.colorIndex  = 3;
+                subZ.colorIndex  = 3;
+                subP.colorIndex  = 3;
+                subAp.colorIndex = 3;
+            }
+        }
+    }
+    else{
+        if (lpiy%2 == 0){
+            if (lpix%2 == 0){
+                subB.colorIndex  = 4;
+                subX.colorIndex  = 4;
+                subR.colorIndex  = 4;
+                subZ.colorIndex  = 4;
+                subP.colorIndex  = 4;
+                subAp.colorIndex = 4;
+            }
+            else{
+                subB.colorIndex  = 5;
+                subX.colorIndex  = 5;
+                subR.colorIndex  = 5;
+                subZ.colorIndex  = 5;
+                subP.colorIndex  = 5;
+                subAp.colorIndex = 5;
+            }
+        }
+        else{
+            if (lpix%2 == 0){
+                subB.colorIndex  = 6;
+                subX.colorIndex  = 6;
+                subR.colorIndex  = 6;
+                subZ.colorIndex  = 6;
+                subP.colorIndex  = 6;
+                subAp.colorIndex = 6;
+            }
+            else{
+                subB.colorIndex  = 7;
+                subX.colorIndex  = 7;
+                subR.colorIndex  = 7;
+                subZ.colorIndex  = 7;
+                subP.colorIndex  = 7;
+                subAp.colorIndex = 7;
+            }
+        }
+    }
+    */
+
     //save in SubParts in Loacality Vector
     // TODO wenn map dann inert
     subDomains.push_back( std::move(subDomain) );
@@ -400,17 +481,17 @@ for (int x=0; x<nlpx; ++x){
                         {
                             //no neighbor -> set reddy dummy
                             subBs[i].neighbourhood[dx+1][dy+1][dz+1] =
-                                &dummyNeighbor_f;
+                                &dummyNeighbor;
                             subXs[i].neighbourhood[dx+1][dy+1][dz+1] =
-                                &dummyNeighbor_f;
+                                &dummyNeighbor;
                             subRs[i].neighbourhood[dx+1][dy+1][dz+1] =
-                                &dummyNeighbor_f;
+                                &dummyNeighbor;
                             subZs[i].neighbourhood[dx+1][dy+1][dz+1] =
-                                &dummyNeighbor_f;
+                                &dummyNeighbor;
                             subPs[i].neighbourhood[dx+1][dy+1][dz+1] =
-                                &dummyNeighbor_f;
+                                &dummyNeighbor;
                             subAps[i].neighbourhood[dx+1][dy+1][dz+1] =
-                                &dummyNeighbor_f;
+                                &dummyNeighbor;
 
                             // going throw MG
                             SparseMatrix* Acur = &A;
@@ -418,15 +499,15 @@ for (int x=0; x<nlpx; ++x){
                                 (*static_cast<std::vector<SubVector>*>(
                                         Acur->mgData->rc->optimizationData))
                                         [i].neighbourhood[dx+1][dy+1][dz+1] =
-                                        &dummyNeighbor_f;
+                                        &dummyNeighbor;
                                 (*static_cast<std::vector<SubVector>*>(
                                         Acur->mgData->xc->optimizationData))
                                         [i].neighbourhood[dx+1][dy+1][dz+1] =
-                                        &dummyNeighbor_f;
+                                        &dummyNeighbor;
                                 (*static_cast<std::vector<SubVector>*>(
                                         Acur->mgData->Axf->optimizationData))
                                         [i].neighbourhood[dx+1][dy+1][dz+1] =
-                                        &dummyNeighbor_f;
+                                        &dummyNeighbor;
                                 Acur = Acur->Ac;
                             }
                         }
@@ -434,17 +515,17 @@ for (int x=0; x<nlpx; ++x){
                             int ii = index(xx,yy,zz,nlpx,nlpy,nlpz);
                             // link to neighbor values
                             subBs[i].neighbourhood[dx+1][dy+1][dz+1] =
-                                                   &subBs[ii].values_f;
+                                                   &subBs[ii];
                             subXs[i].neighbourhood[dx+1][dy+1][dz+1] =
-                                                   &subXs[ii].values_f;
+                                                   &subXs[ii];
                             subRs[i].neighbourhood[dx+1][dy+1][dz+1] =
-                                                   &subRs[ii].values_f;
+                                                   &subRs[ii];
                             subZs[i].neighbourhood[dx+1][dy+1][dz+1] =
-                                                   &subZs[ii].values_f;
+                                                   &subZs[ii];
                             subPs[i].neighbourhood[dx+1][dy+1][dz+1] =
-                                &subPs[ii].values_f;
+                                &subPs[ii];
                             subAps[i].neighbourhood[dx+1][dy+1][dz+1] =
-                                &subAps[ii].values_f;
+                                &subAps[ii];
 
                             // going throw MG
                             SparseMatrix* Acur = &A;
@@ -454,19 +535,19 @@ for (int x=0; x<nlpx; ++x){
                                         [i].neighbourhood[dx+1][dy+1][dz+1] =
                                         &(*static_cast<std::vector<SubVector>*>(
                                             Acur->mgData->rc->optimizationData))
-                                            [ii].values_f;
+                                            [ii];
                                 (*static_cast<std::vector<SubVector>*>(
                                         Acur->mgData->xc->optimizationData))
                                         [i].neighbourhood[dx+1][dy+1][dz+1] =
                                         &(*static_cast<std::vector<SubVector>*>(
                                             Acur->mgData->xc->optimizationData))
-                                            [ii].values_f;
+                                            [ii];
                                 (*static_cast<std::vector<SubVector>*>(
                                         Acur->mgData->Axf->optimizationData))
                                         [i].neighbourhood[dx+1][dy+1][dz+1] =
                                         &(*static_cast<std::vector<SubVector>*>(
                                             Acur->mgData->Axf->optimizationData))
-                                        [ii].values_f;
+                                        [ii];
 
                                 Acur = Acur->Ac;
                             }

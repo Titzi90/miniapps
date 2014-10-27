@@ -221,6 +221,7 @@ _cerr_ << "We have " << subBs.size() << " sub domains" << _endl_;
 
 /******************************************************************************/
 // SPMV TEST
+/*
 #ifdef HPCG_DEBUG
 #ifndef HPCG_NOHPX
   _cerr_ << "starting SPMV test" <<_endl_;
@@ -237,11 +238,12 @@ _cerr_ << "We have " << subBs.size() << " sub domains" << _endl_;
   _cerr_ << "SPMV test ok!\n";
 #endif
 #endif
-
+*/
 /******************************************************************************/
 // SPMV Benchmark
 // no dependencis 
-  {
+/*
+{
   _cerr_ << "starting SPMV benchmark with no dependencis" <<_endl_;
 
   // recerence
@@ -295,8 +297,10 @@ _cerr_ << "We have " << subBs.size() << " sub domains" << _endl_;
   
 #endif
   }
+  */
 
 // one dependencis 
+/*
   {
   _cerr_ << "starting SPMV benchmark with one dependenci" <<_endl_;
 
@@ -351,6 +355,27 @@ _cerr_ << "We have " << subBs.size() << " sub domains" << _endl_;
   
 #endif
   }
+  */
+
+
+/******************************************************************************/
+// SYMGS TEST
+#ifndef HPCG_NOHPX
+  _cerr_ << "starting SYMGS test" <<_endl_;
+  // reverence
+  ComputeSPMV_ref(A_ref, b_ref, x_ref);
+
+  // optimiced
+  ComputeSPMV    (A   , b     , x    );
+
+  //varivate data
+  for (local_int_t i=0; i<x.localLength; ++i){
+    HPX_ASSERT(x_ref.values[i] == x.values[i]);
+  }
+  _cerr_ << "SPMV test ok!\n";
+#endif
+
+
 
 
 
