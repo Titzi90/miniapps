@@ -63,27 +63,23 @@ struct SubDomain{
 typedef hpx::shared_future< std::vector<double*> > VectorValues_future;
 
 // subvector including data and geometry and meta informations
-struct SubVector{
+class SubVector{
+public:
     // standard constructor
     SubVector (){}
     // Constructor creating dummy
     SubVector (VectorValues_future vecVal)
         :localLength(-1), localetyValues(0), values_f(vecVal), colorIndex(-1) {}
 
-    // the lenth of the subvector
+private:
+    // number of values of this subdomain
     local_int_t localLength;
     
-    // pointer to the whol vector on the localety
-    double* localetyValues;
-
-    // future of the subvectorvalues (subvector points to localety values)
+    // future of the subvectorvalues
     VectorValues_future values_f;
 
-    // colorindex for the multicolor Gaus-Seidel
-    int colorIndex;     //TODO löschen
-
-    // pointers too all sourunding fututres of subvectorvalues.
-    SubVector* neighbourhood[3][3][3];
+    // Refference of all neighboring Sub Vectors including my selve
+    SubVector& neighbourhood[3][3][3];
 
     inline std::vector< VectorValues_future > getNeighbourhood()
     {

@@ -362,7 +362,7 @@ _cerr_ << "We have " << subBs.size() << " sub domains" << _endl_;
 // SYMGS TEST
 #ifndef HPCG_NOHPX
   _cerr_ << "starting SYMGS test" <<_endl_;
-  // reverence
+  // refference
   ComputeSPMV_ref(A_ref, b_ref, x_ref);
 
   // optimiced
@@ -374,14 +374,6 @@ _cerr_ << "We have " << subBs.size() << " sub domains" << _endl_;
   }
   _cerr_ << "SPMV test ok!\n";
 #endif
-
-
-
-
-
-
-
-
 
 
 
