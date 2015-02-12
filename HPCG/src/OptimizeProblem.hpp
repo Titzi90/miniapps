@@ -15,215 +15,151 @@
 #ifndef OPTIMIZEPROBLEM_HPP
 #define OPTIMIZEPROBLEM_HPP
 
+#ifndef HPCG_NOHPX
+
 #include "SparseMatrix.hpp"
 #include "Vector.hpp"
 #include "CGData.hpp"
-#include <cassert>
-#include <vector>
-
-#ifndef HPCG_NOHPX
 
 #include <algorithm>
+#include <cassert>
+#include <vector>
+#include <set>
+
 #include <hpx/hpx.hpp>
 
 
 /*******************MATRIX*****************************************************/
 
-// datastructure of Matrixvalues
-struct MatrixValues{
+// SubMatrix holds the matrix values of the SubDomain
+struct SubMatrix{
+    // Vector of pointers to original matrix rows
     std::vector<double*> values;
+    // Vector of pointers to diagonal value
     std::vector<double*> diagonal;
-    std::vector<global_int_t*> indG;   // Pointer to matrix indexi of the global domain TODO ???
-    std::vector<local_int_t*> indLoc;  // Pointer to matrix indexi of the localyty domain
+    // Pointer to matrix indexi of the global domain
+    //TODO zur Zeit eh nur eine Localety, danach muss man mal schauen wie das läuft.
+    std::vector<global_int_t*> indG;
+    // Vector of pointers to original matrix indexi in the localyty domain
+    std::vector<local_int_t*> indLoc;
+    // Vector of pointers to the number of nonzero Values per row
     std::vector<char*> nonzerosInRow;
 };
-typedef hpx::shared_future<MatrixValues> MatrixValues_furure;
+typedef hpx::shared_future<SubMatrix> SubMatrix_future;
 
-
-// SubMatrix including values and geometic data
+// SubDomain holdes the SubMatrix and geometic datas
 struct SubDomain{
-    int nlpx;       // number of local sub process in x direction.
-    int nlpy;       // number of local sub process in y direction.
-    int nlpz;       // number of local sub process in z direction.
-    int nlp ;       // number of locasl sub process in this locality
-    int lpix;       // local process id in x direction
-    int lpiy;       // local process id in x direction
-    int lpiz;       // local process id in x direction
-    int nlx ;       // number of local points in x direction
-    int nly ;       // number of local points in y direction
-    int nlz ;       // number of local points in z direction
-    local_int_t localNumberRows;
+    //TODO auf mehren Localitys? Reicht es dafür zu soregen das auf localer Locelety ausgeführt wird?
+    int numSubDomains ;     // Number of SubDomains
+    int numSubDomainsX;     // Number of SubDomains in x direction.
+    int numSubDomainsY;     // Number of SubDomains in y direction.
+    int numSubDomainsZ;     // Number of SubDomains in z direction.
+    int subID ;     // SubDomain ID
+    int subIDx;     // SubDomain ID in x direction
+    int subIDy;     // SubDomain ID in y direction
+    int subIDz;     // SubDomain ID in z direction
+    int numSubPoints ;       // number of points in SubDomain
+    int numSubPointsX;       // number of points in x direction
+    int numSubPointsY;       // number of points in y direction
+    int numSubPointsZ;       // number of points in z direction
 
-    MatrixValues_furure matrixValues;
+    std::set<int> dependencies; // set of dependent SubDomainIDs (subID)
+
+    SubMatrix_future subMatrix_f;   // Future of SubMatrix holding the values
 };
 
 
 /*******************VECTOR*****************************************************/
 
-typedef hpx::shared_future< std::vector<double*> > VectorValues_future;
+// SubVectorValues holdes the vector values of the SubDomain
+typedef std::vector<double*> SubVectorValues;
+typedef hpx::shared_future<SubVectorValues> SubVectorValues_future;
 
-// subvector including data and geometry and meta informations
-class SubVector{
-public:
-    // standard constructor
-    SubVector (){}
-    // Constructor creating dummy
-    SubVector (VectorValues_future vecVal)
-        :localLength(-1), localetyValues(0), values_f(vecVal), colorIndex(-1) {}
-
-private:
-    // number of values of this subdomain
-    local_int_t localLength;
-    
-    // future of the subvectorvalues
-    VectorValues_future values_f;
-
-    // Refference of all neighboring Sub Vectors including my selve
-    SubVector& neighbourhood[3][3][3];
-
-    inline std::vector< VectorValues_future > getNeighbourhood()
-    {
-        return getNeighbourhood(9);
-    }
-
-    // returening all neigbours less then colorLevel
-    inline std::vector<VectorValues_future> getNeighbourhood(int const colorLevel)
-    {
-        std::vector< VectorValues_future > neighbours;
-        neighbours.reserve(27);
-        for (int x=0; x<3; ++x){
-            for (int y=0; y<3; ++y){
-                for (int z=0; z<3; ++z){
-                    if (neighbourhood[x][y][z]->colorIndex < colorLevel){
-                        neighbours.push_back(neighbourhood[x][y][z]->values_f);
-                    }
-                }
-            }
-        }
-
-        return std::move(neighbours);
-    }
+// SubVector holdes the SubVectorValues and geometry date and meta informations
+struct SubVector{
+    int subID;          // corresponding SubDomain ID
+    int subLength;      // Number of values in subDomain
+    SubVectorValues_future subValues_f;     // future of the subVectorValues
 
 };
-
-// dummy ready future for non existing neighbors
-static SubVector dummyNeighbor(hpx::make_ready_future(std::vector<double*>() ) );
-
 
 /*******************MG OPERATOR************************************************/
 
-struct SubF2COperator{
-    std::vector<local_int_t*> f2cOperator;
-};
-typedef hpx::shared_future<SubF2COperator> SubF2C;
+typedef std::vector<local_int_t*> SubF2COperatorValues;
+typedef hpx::shared_future<SubF2COperatorValues> SubF2COperatorValues_f;
 
 
 /*******************HELPER FUNKTIONS*******************************************/
 
-// ca)culating the 1D prozessor index out of the 3D index
-inline int index(int const lpix, int const lpiy, int const lpiz,
-                 int const nlpx, int const nlpy, int const nlpz){
-    return lpiz * (nlpx*nlpy) + lpiy * (nlpx) + lpix;
+// calculating the 1D SubDomain index out of the 3D index
+inline int index(int const subIDx, int const subIDy, int const subIDz,
+                 int const numSubDomainsX, int const numSubDomainsY,
+                 int const numSubDomainsZ)
+{
+    return subIDz * (numSubDomainsX*numSubDomainsY) + subIDy * (numSubDomainsX) + subIDx;
 }
 
 // calculating the 1D prozessor index from a SubDomain
 inline int index(SubDomain const & A){
-    return index(A.lpix, A.lpiy, A.lpiz, A.nlpx, A.nlpy, A.nlpz);
+    return index(A.subIDx, A.subIDy, A.subIDz,
+                 A.numSubDomainsX, A.numSubDomainsY, A.numSubDomainsZ);
 }
 
-//wait untill SubDomain is ready
-inline hpx::future<std::vector<VectorValues_future> > when_vec(Vector v)
+// calculating the SubDomain (1D index) that conatins the element
+// giffen by the (localety) matrix index
+// TODO mehre localetys???
+inline int belongsTo (const int element,
+                      const int numSubDomainsX,
+                      const int numSubDomainsY,
+                      const int numSubDomainsZ,
+                      const int numSubPointsX,
+                      const int numSubPointsY,
+                      const int numSubPointsZ
+                     )
+{ 
+    int nz = numSubDomainsZ * numSubPointsZ;
+    int ny = numSubDomainsY * numSubPointsY;
+    int nx = numSubDomainsX * numSubPointsX;
+
+    // calculate the 3D cordinates of the element
+    int eleZ =  element / (nx*ny);
+    int eleY = (element-eleZ*nx*ny) / nx;
+    int eleX =  element % nx;
+
+    // calculate the 3d cordinates of the containing SubDomain
+    int subZ = eleZ / numSubPointsZ;
+    int subY = eleY / numSubPointsY;
+    int subX = eleX / numSubPointsX;
+
+    // calculate the 1D index of the subDomain
+    return index(subX, subY, subZ,
+                 numSubDomainsX, numSubDomainsY, numSubDomainsZ);
+}
+
+// returens a future that becomes ready when the Vector v is ready
+// this is when all values in the SubVectors are ready
+inline hpx::future<std::vector<SubVectorValues_future> > when_vec(Vector v)
 {
-    std::vector<VectorValues_future> subVs_f;
+    std::vector<SubVectorValues_future> subVVs_f;
     
     std::vector<SubVector>  & subVs =
         *static_cast<std::vector<SubVector>* >(v.optimizationData);
     for(size_t i=0; i<subVs.size(); ++i)
     {
-        subVs_f.push_back(subVs.at(i).values_f);
+        subVVs_f.push_back(subVs.at(i).subValues_f);
     }
 
-    return hpx::when_all(subVs_f);
+    return hpx::when_all(subVVs_f);
 }
 
-
-//TODO brauch ich das noch?
-/*
-struct Neighborhood{
-    Neighborhood(){
-        for (int i=0;i<27;++i)
-            *(data+i) = -1;
-    }
-
-    void insert(int const x, int const y, int const z, int const val){
-        asserte(x >=-1 && x<=1 && y >=-1 && y<=1 && z >=-1 && z<=1);
-        data[x+1][y+1][z+1] = val;
-    }
-
-    int get(int const x, int const y, int const z) const{
-        asserte(x >=-1 && x<=1 && y >=-1 && y<=1 && z >=-1 && z<=1);
-        return data[x+1][y+1][z+1];
-    }
-
-    bool hasNeighbor(int const x, int const y, int const z) const{
-        asserte(x >=-1 && x<=1 && y >=-1 && y<=1 && z >=-1 && z<=1);
-        return data[x+1][y+1][z+1] != -1;
-    }
-
-    std::vector<int> getNeighbors(){
-        std::vector<int> neighbors;
-        neighbors.reserve(27);
-        
-        for (int i=0; i<27; ++i){
-            if(*(data+i) != -1)
-                neighbors.push_back( *(data+i) );
-        }
-
-        return neighbors;
-    }
-
-private:
-    int data[3][3][3];
-};
-
-
-//TODO Hallo
-Neighborhood getNeighbor(LocalSubDomain const & A){
-    int& lpix = A.lpix;
-    int& lpiy = A.lpiy;
-    int& lpiz = A.lpiz;
-    int& nlpx = A.nlpx;
-    int& nlpy = A.nlpy;
-    int& nlpz = A.nlpz;
-
-    Neighborhood neighborhod();
-
-    for (int dx=-1;dx<=1;++dx){
-        int x = dx + lpix;
-        if(x<0 || x>=nlpx) continue;
-
-        for (int dy=-1;dy<=1;++dy){
-            int y = dy + lpiy;
-            if(y<0 || y>=nlpy) continue;
-
-            for (int dz=-1;dz<=1;++dz){
-                int z = dz + lpiz;
-                if(y<0 || y>=nlpy) continue;
-
-                neighborhod.insert(dx,dy,dz, index(x,y,z,nlpx,nlpy,nlpz) ); 
-            }
-        }
-    }
-
-    return neighborhod;
-}
-*/
+#endif  // NOT NO_HPX
 
 // Funtion to create Optimized Data
-int OptimizeProblem(SparseMatrix & A, CGData & data,  Vector & b, Vector & x, Vector & xexact);
+int OptimizeProblem(SparseMatrix & A,
+                    CGData & data,
+                    Vector & b,
+                    Vector & x,
+                    Vector & xexact
+                   );
 
-#else
-// dummy function
-int OptimizeProblem(SparseMatrix & A, CGData & data,  Vector & b, Vector & x, Vector & xexact);
-#endif  // NOT NO_HPX
 #endif  // OPTIMIZEPROBLEM_HPP

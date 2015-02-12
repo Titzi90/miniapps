@@ -1,4 +1,4 @@
-
+//:
 //@HEADER
 // ***************************************************
 //
@@ -8,7 +8,7 @@
 // ***************************************************
 //@HEADER
 
-
+// INCLUDES
 #include <fstream>
 #include <iostream>
 #include <cstdlib>
@@ -35,6 +35,8 @@
 #include "mytimer.hpp"
 #include "ComputeSPMV_ref.hpp"
 #include "ComputeSPMV.hpp"
+#include "ComputeSYMGS_ref.hpp"
+#include "ComputeSYMGS.hpp"
 #include "ComputeMG_ref.hpp"
 #include "ComputeResidual.hpp"
 #include "CG.hpp"
@@ -48,52 +50,57 @@
 #include "TestNorms.hpp"
 
 
-#ifndef HPCG_NOHPX
-#define _cout_ hpx::cout
-#define _cerr_ hpx::cerr
-#define _endl_ hpx::endl
-#else
-#define _cout_ std::cout
-#define _cerr_ std::cerr
-#define _endl_ std::endl
-#endif
+//#ifndef HPCG_NOHPX
+//#define COUT hpx::cout
+//#define CERR hpx::cerr
+//#define ENDL hpx::endl
+//#else
+#define COUT std::cout
+#define CERR std::cerr
+#define ENDL std::endl
+//#endif
+
 
 #ifdef HPCG_DETAILED_DEBUG
 using std::cin;
 #endif
-using _endl_;
 
 int main(int argc, char * argv[]) {
 
+CERR.precision(20);
+COUT.precision(20);
 
 #ifndef HPCG_NOHPX
 if(0 == hpx::get_locality_id())
 {
-  _cerr_<<"Using HPX"<<_endl_;
+  CERR<<"Using HPX"<<ENDL;
 }
 #endif
 #ifndef HPCG_NOOPENMP
-  _cerr_<<"Using OMP"<<_endl_;
+  CERR<<"Using OMP"<<ENDL;
 #endif
 #ifndef HPCG_NOMPI
-  _cerr_<<"Using MPI"<<_endl_;
+  CERR<<"Using MPI"<<ENDL;
 #endif
 
   HPCG_Params params;
 
   HPCG_Init(&argc, &argv, params);
 
-  int size = params.comm_size, rank = params.comm_rank; // Number of MPI processes/HPX localitys, My MPI process ID/HPX locality ID
+  // Number of MPI processes/HPX localitys, My MPI process ID/HPX locality ID
+  int size = params.comm_size;
+  int rank = params.comm_rank;
 
 #ifdef HPCG_DETAILED_DEBUG
 #ifndef HPCG_NOHPX
-  HPCG_fout << "Process "<<rank<<" of "<<size<<" is alive with " << params.numThreads << " threads.\n" << hpx::flush;
+  HPCG_fout << "Process "<<rank<<" of "<<size<<" is alive with "
+            << params.numThreads << " threads.\n" << hpx::flush;
 #endif
 
   /*
   if (rank==0) {
     char c;
-    _cout_ << "Press key to continue"<< _endl_;
+    COUT << "Press key to continue"<< ENDL;
     std::cin.get(c);
   }
   */
@@ -105,9 +112,7 @@ if(0 == hpx::get_locality_id())
   nz = (local_int_t)params.nz;
   int ierr = 0;  // Used to check return codes on function calls
 
-  // //////////////////////
-  // Problem setup Phase //
-  /////////////////////////
+/***********PROBLEM SETUP PHASE***********************************************/
 
 // setup Problem as usualy
 
@@ -132,6 +137,7 @@ if(0 == hpx::get_locality_id())
   GenerateProblem(A, &b, &x, &xexact);
   SetupHalo(A_ref);
   SetupHalo(A);
+  /*    TODO MG
   int numberOfMgLevels = 4; // Number of levels including first
   SparseMatrix * curLevelMatrix_ref = &A_ref;
   for (int level = 1; level< numberOfMgLevels; ++level) {
@@ -143,50 +149,47 @@ if(0 == hpx::get_locality_id())
       GenerateCoarseProblem(*curLevelMatrix);
       curLevelMatrix = curLevelMatrix->Ac; // Make the just-constructed coarse grid the next level
   }
-
+  */
 
   CGData data_ref;
   CGData data;
   InitializeSparseCGData(A_ref, data_ref);
   InitializeSparseCGData(A, data);
 
-
   // Use this array for collecting timing information
   std::vector< double > times(9,0.0);
 
-
-
   // Call user-tunable set up function.
-  double t7 = mytimer(); OptimizeProblem(A, data, b, x, xexact); t7 = mytimer() - t7;
+  double t7 = mytimer(); OptimizeProblem(A, data, b, x, xexact);
+  t7 = mytimer() - t7;
   times[7] = t7;
 
 #ifdef HPCG_DEBUG
-  if (rank==0) HPCG_fout << "Total problem setup time in main (sec) = " << mytimer() - t1 << endl;
-  if (rank==0) _cerr_ << "Total problem setup time in main (sec) = " << mytimer() - t1 << endl;
-  if (rank==0) HPCG_fout << "Optimization setuptime (sec) = " << times[7] << endl;
-  if (rank==0) _cerr_ << "Optimization setuptime (sec) = " << times[7] << endl;
+  if (rank==0) HPCG_fout << "Total problem setup time in main (sec) = " << mytimer() - t1 << ENDL;
+  if (rank==0) CERR << "Total problem setup time in main (sec) = " << mytimer() - t1 << ENDL;
+  if (rank==0) HPCG_fout << "Optimization setuptime (sec) = " << times[7] << ENDL;
+  if (rank==0) CERR << "Optimization setuptime (sec) = " << times[7] << ENDL;
 #endif
 
+{/***********CHECK FOR ERRORS WHILE SETUP**************************************/
 
-/******************************************************************************/
 #ifndef HPCG_NOHPX
-  _cerr_ << "we have " << size << " localitys with " 
-            << params.numThreads << " hpx threads" <<_endl_;
-
+  CERR << "we have " << size << " localitys with " 
+            << params.numThreads << " hpx threads" <<ENDL;
 
 #ifdef HPCG_DEBUG
-  _cerr_ << "startin init test..." << _endl_;
+  CERR << "startin init test..." << ENDL;
 // compare data (ohne MG data)
-  HPX_ASSERT(b_ref.localLength == b.localLength);
-  HPX_ASSERT(x_ref.localLength == x.localLength);
-  HPX_ASSERT(data_ref.r.localLength == data.r.localLength);
-  HPX_ASSERT(data_ref.z.localLength == data.z.localLength);
-  HPX_ASSERT(data_ref.p.localLength == data.p.localLength);
-  HPX_ASSERT(data_ref.Ap.localLength == data.Ap.localLength);
-  HPX_ASSERT(A_ref.totalNumberOfRows == A.totalNumberOfRows);
+  HPX_ASSERT(b_ref.localLength           == b.localLength);
+  HPX_ASSERT(x_ref.localLength           == x.localLength);
+  HPX_ASSERT(data_ref.r.localLength      == data.r.localLength);
+  HPX_ASSERT(data_ref.z.localLength      == data.z.localLength);
+  HPX_ASSERT(data_ref.p.localLength      == data.p.localLength);
+  HPX_ASSERT(data_ref.Ap.localLength     == data.Ap.localLength);
+  HPX_ASSERT(A_ref.totalNumberOfRows     == A.totalNumberOfRows);
   HPX_ASSERT(A_ref.totalNumberOfNonzeros == A.totalNumberOfNonzeros);
-  HPX_ASSERT(A_ref.localNumberOfRows == A.localNumberOfRows);
-  HPX_ASSERT(A_ref.localNumberOfColumns == A.localNumberOfColumns);
+  HPX_ASSERT(A_ref.localNumberOfRows     == A.localNumberOfRows);
+  HPX_ASSERT(A_ref.localNumberOfColumns  == A.localNumberOfColumns);
   HPX_ASSERT(A_ref.localNumberOfNonzeros == A.localNumberOfNonzeros);
   for (local_int_t i=0; i<b.localLength; ++i){
       HPX_ASSERT(b_ref.values[i] == b.values[i]);
@@ -195,56 +198,63 @@ if(0 == hpx::get_locality_id())
       HPX_ASSERT(x_ref.values[i] == x.values[i]);
   }
   for (local_int_t i=0; i<A.localNumberOfRows; ++i){
-      HPX_ASSERT(A_ref.nonzerosInRow[i] == A.nonzerosInRow[i]);
+      HPX_ASSERT( A_ref.nonzerosInRow[i]  ==  A.nonzerosInRow[i]);
       HPX_ASSERT(*A_ref.matrixDiagonal[i] == *A.matrixDiagonal[i]);
     for (int j=0; j<A.nonzerosInRow[i]; ++j){
         HPX_ASSERT(A_ref.matrixValues[i][j] == A.matrixValues[i][j]);
-        HPX_ASSERT(A_ref.mtxIndG[i][j] == A.mtxIndG[i][j]);
-        HPX_ASSERT(A_ref.mtxIndL[i][j] == A.mtxIndL[i][j]);
+        HPX_ASSERT(A_ref.mtxIndG[i][j]      == A.mtxIndG[i][j]);
+        HPX_ASSERT(A_ref.mtxIndL[i][j]      == A.mtxIndL[i][j]);
     }
   }
-  _cerr_ << "init test ok!" <<_endl_;
-#endif
-
-  std::vector<SubVector>  & subBs =
-        *static_cast<std::vector<SubVector>* >(x.optimizationData);
-_cerr_ << "We have " << subBs.size() << " sub domains" << _endl_;
-#ifdef HPCG_DEBUG
-  for(size_t i=0; i<subBs.size(); ++i){
-      VectorValues_future values_f = subBs[i].values_f;
-      std::vector<double*> values = values_f.get();
-      HPX_ASSERT(values.size() == subBs[i].localLength);
+  std::vector<SubVector>  & subXs =
+        *static_cast< std::vector<SubVector>* >(x.optimizationData);
+  for(size_t i=0; i<subXs.size(); ++i){
+      SubVectorValues_future values_f = subXs[i].subValues_f;
+      SubVectorValues        values   = values_f.get();
+      HPX_ASSERT(values.size() == subXs[i].subLength);
   }
+
+  CERR << "init test ok!" <<ENDL;
 #endif
 
-#endif
+CERR << "We have " << subXs.size() << " sub domains" << ENDL;
 
-/******************************************************************************/
-// SPMV TEST
-/*
+#endif
+}
+
+{/************SPMV TEST*********************************************************/
+
 #ifdef HPCG_DEBUG
 #ifndef HPCG_NOHPX
-  _cerr_ << "starting SPMV test" <<_endl_;
+  CERR << "starting SPMV test..." << ENDL;
   // reverence
   ComputeSPMV_ref(A_ref, b_ref, x_ref);
-
   // optimiced
   ComputeSPMV    (A   , b     , x    );
 
+  // wait to finish computation
+  when_vec(x).get();
+
   //varivate data
-  for (local_int_t i=0; i<x.localLength; ++i){
+//CERR << "Values: #ele   ref    opt" << ENDL;
+for (local_int_t i=0; i<x.localLength; ++i){
+//CERR << i << "    " << x_ref.values[i] << "     " << x.values[i] << ENDL;
+//if(x_ref.values[i] != x.values[i]) CERR << "ERROR by " << i << ": " << x_ref.values[i] << " " << x.values[i] << ENDL;
     HPX_ASSERT(x_ref.values[i] == x.values[i]);
   }
-  _cerr_ << "SPMV test ok!\n";
+
+  CERR << "SPMV test ok!" << ENDL;
 #endif
 #endif
-*/
-/******************************************************************************/
-// SPMV Benchmark
+}
+
+{/************SPMV BENCHMARK****************************************************/
+//TODO überarbeiten 
+
 // no dependencis 
 /*
 {
-  _cerr_ << "starting SPMV benchmark with no dependencis" <<_endl_;
+  CERR << "starting SPMV benchmark with no dependencis" <<ENDL;
 
   // recerence
   int repeat_ref = 4;
@@ -258,8 +268,8 @@ _cerr_ << "We have " << subBs.size() << " sub domains" << _endl_;
   }
   repeat_ref /= 2;
   ref_time /= repeat_ref;
-  _cout_ << ref_time << " sec. average (saple size: " << repeat_ref
-            << ") non optimized runtime" << _endl_;
+  COUT << ref_time << " sec. average (saple size: " << repeat_ref
+            << ") non optimized runtime" << ENDL;
 
   //optimized version
 #ifndef HPCG_NOHPX
@@ -289,20 +299,20 @@ _cerr_ << "We have " << subBs.size() << " sub domains" << _endl_;
   repeat_opt /= 2;
   thread_time = 1000. * opt_time/threads;
   opt_time /= repeat_opt;
-  _cout_ << opt_time << " sec. average (saple size: " << repeat_opt
-            << ") optimized hpx runtime (inc. barriers)" << _endl_;
-  _cout_ << 0.01 * idleRate << "% total idle rate"   << _endl_;
-  _cout_ << threads << " total number of hpx threads" << _endl_;
-  _cout_ << thread_time << " ms work per thread" << _endl_;
+  COUT << opt_time << " sec. average (saple size: " << repeat_opt
+            << ") optimized hpx runtime (inc. barriers)" << ENDL;
+  COUT << 0.01 * idleRate << "% total idle rate"   << ENDL;
+  COUT << threads << " total number of hpx threads" << ENDL;
+  COUT << thread_time << " ms work per thread" << ENDL;
   
 #endif
   }
-  */
+*/
 
 // one dependencis 
 /*
   {
-  _cerr_ << "starting SPMV benchmark with one dependenci" <<_endl_;
+  CERR << "starting SPMV benchmark with one dependenci" <<ENDL;
 
   // recerence
   int repeat_ref = 4;
@@ -316,8 +326,8 @@ _cerr_ << "We have " << subBs.size() << " sub domains" << _endl_;
   }
   repeat_ref /= 2;
   ref_time /= repeat_ref;
-  _cout_ << ref_time << " sec. average (saple size: " << repeat_ref
-            << ") non optimized runtime" << _endl_;
+  COUT << ref_time << " sec. average (saple size: " << repeat_ref
+            << ") non optimized runtime" << ENDL;
 
   //optimized version
 #ifndef HPCG_NOHPX
@@ -347,47 +357,77 @@ _cerr_ << "We have " << subBs.size() << " sub domains" << _endl_;
   repeat_opt /= 2;
   thread_time = 1000. * opt_time/threads;
   opt_time /= repeat_opt;
-  _cout_ << opt_time << " sec. average (saple size: " << repeat_opt
-            << ") optimized hpx runtime (with no barriers)" << _endl_;
-  _cout_ << 0.01 * idleRate << "% total idle rate"   << _endl_;
-  _cout_ << threads << " total number of hpx threads" << _endl_;
-  _cout_ << thread_time << " ms work per thread" << _endl_;
+  COUT << opt_time << " sec. average (saple size: " << repeat_opt
+            << ") optimized hpx runtime (with no barriers)" << ENDL;
+  COUT << 0.01 * idleRate << "% total idle rate"   << ENDL;
+  COUT << threads << " total number of hpx threads" << ENDL;
+  COUT << thread_time << " ms work per thread" << ENDL;
   
 #endif
   }
-  */
+*/
+}
 
+{/************SYMGS TEST********************************************************/
 
-/******************************************************************************/
-// SYMGS TEST
+#ifdef HPCG_DEBUG
 #ifndef HPCG_NOHPX
-  _cerr_ << "starting SYMGS test" <<_endl_;
+  CERR << "starting SYMGS test..." << ENDL;
+/*
+ * Vergleichen mit seriell macht kein sinn, da andere reinfolge!
   // refference
-  ComputeSPMV_ref(A_ref, b_ref, x_ref);
-
+  ComputeSYMGS_ref(A_ref, b_ref, x_ref);
   // optimiced
-  ComputeSPMV    (A   , b     , x    );
+  ComputeSYMGS    (A   , b     , x    );
+
+  // wait to finish computation
+  when_vec(x).get();
 
   //varivate data
   for (local_int_t i=0; i<x.localLength; ++i){
     HPX_ASSERT(x_ref.values[i] == x.values[i]);
   }
-  _cerr_ << "SPMV test ok!\n";
+*/
+ 
+  // Test with ones vector = soulution
+  FillVector(x,1);
+  ComputeSYMGS(A,b,x);
+
+  when_vec(x).get();
+  // every thing should stay one
+  for (local_int_t i=0; i<x.localLength; ++i){
+    HPX_ASSERT(1 == x.values[i]);
+  }
+
+  // Test with zero vector (x and b)
+  FillVector(b,0);
+  FillVector(x,0);
+  ComputeSYMGS(A,b,x);
+
+  when_vec(x).get();
+  // every thing should stay zero
+  for (local_int_t i=0; i<x.localLength; ++i){
+    HPX_ASSERT(0 == x.values[i]);
+  }
+
+  CERR << "SYMGS test ok!" << ENDL;
+
 #endif
+#endif
+}
+
+{/************SYMGS BENCHMARK***************************************************/
 
 
 
 
+}
 
+/***********FINALISE**********************************************************/
 
 #ifdef HPCG_DETAILED_DEBUG
   //if (geom->size == 1) WriteProblem(*geom, A, b, x, xexact);
 #endif
-
-
-
-
-
 
   // Clean up
   DeleteMatrix(A_ref); // This delete will recursively delete all coarse grid data
@@ -406,7 +446,9 @@ _cerr_ << "We have " << subBs.size() << " sub domains" << _endl_;
   // Finish up
 
 #ifdef HPCG_DEBUG
-  HPCG_fout << "Total report results phase execution time in main (sec) = " << mytimer() - t1 << endl;
+  HPCG_fout << "Total report results phase execution time in main (sec) = "
+            << mytimer() - t1 << ENDL;
 #endif
+
   return 0 ;
 }

@@ -57,38 +57,39 @@ int ComputeSPMV(const SparseMatrix & A, Vector & x, Vector & y) {
 #include <algorithm>
 #include <tuple>
 
-
 #include <boost/iterator/counting_iterator.hpp>
 
+/*
+// async without sub domains by Harald
+hpx::future<void> ComputeSPMV_async( const SparseMatrix & A, [>const<] Vector & x, Vector & y) {
 
-//hpx::future<void> ComputeSPMV_async( const SparseMatrix & A, [>const<] Vector & x, Vector & y) {
+  assert(x.localLength>=A.localNumberOfColumns); // Test vector lengths
+  assert(y.localLength>=A.localNumberOfRows);
 
-  //assert(x.localLength>=A.localNumberOfColumns); // Test vector lengths
-  //assert(y.localLength>=A.localNumberOfRows);
+#ifndef HPCG_NOMPI
+    ExchangeHalo(A,x);
+#endif
 
-//#ifndef HPCG_NOMPI
-    //ExchangeHalo(A,x);
-//#endif
+  const double * const xv = x.values;
+  double * const yv = y.values;
+  const local_int_t nrow = A.localNumberOfRows;
 
-  //const double * const xv = x.values;
-  //double * const yv = y.values;
-  //const local_int_t nrow = A.localNumberOfRows;
+  typedef boost::counting_iterator<local_int_t> iterator;
 
-  //typedef boost::counting_iterator<local_int_t> iterator;
+  return hpx::parallel::for_each(
+    hpx::parallel::task, iterator(0), iterator(nrow),
+    [xv, yv, &A](local_int_t i) {
+      double sum = 0.0;
+      const double * const cur_vals = A.matrixValues[i];
+      const local_int_t * const cur_inds = A.mtxIndL[i];
+      const int cur_nnz = A.nonzerosInRow[i];
 
-  //return hpx::parallel::for_each(
-    //hpx::parallel::task, iterator(0), iterator(nrow),
-    //[xv, yv, &A](local_int_t i) {
-      //double sum = 0.0;
-      //const double * const cur_vals = A.matrixValues[i];
-      //const local_int_t * const cur_inds = A.mtxIndL[i];
-      //const int cur_nnz = A.nonzerosInRow[i];
-
-      //for (int j=0; j< cur_nnz; j++)
-        //sum += cur_vals[j]*xv[cur_inds[j]];
-      //yv[i] = sum;
-    //});
-//}
+      for (int j=0; j< cur_nnz; j++)
+        sum += cur_vals[j]*xv[cur_inds[j]];
+      yv[i] = sum;
+    });
+}
+*/
 
 /******************************************************************************/
 
@@ -96,7 +97,7 @@ int ComputeSPMV(const SparseMatrix & A, Vector & x, Vector & y) {
 
 // Matrix Vector Mul of one row
 inline double mul(double const * mtxVal,
-                  local_int_t const * mtxInd,
+                  int const * mtxInd,
                   char const nonzeros,
                   double const * vecVal)
 {
@@ -108,12 +109,14 @@ inline double mul(double const * mtxVal,
 }
 
 // Matrix Vector Mul of a sub vector
+// vecVal is the whole localaty vector
+// subMtx and subYv are just the subVectors
 // subYv = SubMtx * vecVal
-inline std::vector<double*> subMul(MatrixValues const subMtx,
+inline std::vector<double*> subMul(SubMatrix const & subMtx,
                                    double const * vecVal,
-                                   std::vector<double*> subYv)
+                                   SubVectorValues subYv)   //TODO warum keine Ref.????
 {
-    for (local_int_t row=0; row<subYv.size(); ++row)
+    for (int row=0; row<subYv.size(); ++row)
     {
         *subYv[row] = mul(subMtx.values[row],
                           subMtx.indLoc[row],
@@ -123,76 +126,77 @@ inline std::vector<double*> subMul(MatrixValues const subMtx,
     return subYv;
 }
 
-
-// wrapper arund mul function for async call
-// waits untill all dependencis are avilible and then calls mul function
-hpx::future<std::vector<double*> > asyncMul(MatrixValues_furure& mtx_f,
-                                            SubVector& vec,
-                                            VectorValues_future& res_f)
-{
-
-    auto unwrapper = [vec](MatrixValues_furure mtx_f,
-                         std::vector<hpx::shared_future<std::vector<double*> > >,
-                         VectorValues_future res_f
-                         )
-                    {
-                        return subMul(mtx_f.get(),
-                                      vec.localetyValues,
-                                      res_f.get()
-                                     );
-                    };
-
-    return hpx::lcos::local::dataflow(
-                hpx::launch::async, unwrapper,
-                mtx_f, vec.getNeighbourhood(), res_f
-            );
-
-}
-
-
-int ComputeSPMV_sub_async(SparseMatrix const & A, Vector  & x, Vector& y )
+// Sparse Matric Vector Multiplication
+// makeing use of the SubDomains
+int ComputeSPMV_sub_async(SparseMatrix const & A, Vector const & x, Vector& y )
 {
 #ifdef HPCG_DEBUG
     std::cout << "using SPMV_sub_async" << std::endl;
 #endif
 //TODO more localytsy
-//TODO zusammenschieben?
 
-  std::vector<SubDomain>  & subAs =
-      *static_cast<std::vector<SubDomain>* >(A.optimizationData);
-  std::vector<SubVector>  & subXs =
-      *static_cast<std::vector<SubVector>* >(x.optimizationData);
-  std::vector<SubVector>& subYs =
-      *static_cast<std::vector<SubVector>* >(y.optimizationData);
+    std::vector<SubDomain>  & subAs =
+        *static_cast<std::vector<SubDomain>* >(A.optimizationData);
+    std::vector<SubVector>  & subXs =
+        *static_cast<std::vector<SubVector>* >(x.optimizationData);
+    std::vector<SubVector>& subYs =
+        *static_cast<std::vector<SubVector>* >(y.optimizationData);
 
-  // loop over all subdomains
-  // TODO foreach
+    // function to handel the dependencies and call the SubMulOperator
+    auto unwrapper = [&x]
+            (SubVectorValues_future subYv_f,
+             SubMatrix_future       subMtx_f,
+             std::vector<SubVectorValues_future> subXv_fs
+            )
+            {
+                return subMul( subMtx_f.get(), x.values, subYv_f.get() );
+            };
+
+    // loop over all subdomains
     for(size_t i=0; i<subYs.size(); ++i)
     {
-        SubVector  & subY = subYs.at(i);
-        SubVector  & subX = subXs.at(i);
-        SubDomain  & subA = subAs.at(i);
+        SubVector & subY = subYs.at(i);
+        SubVector & subX = subXs.at(i);
+        SubDomain & subA = subAs.at(i);
 
-        HPX_ASSERT(subX.localLength == subY.localLength);
+        HPX_ASSERT(subX.subLength == subY.subLength);
 
-        subY.values_f = asyncMul(subA.matrixValues,
-                                 subX,
-                                 subY.values_f);
+        // Vector of all SubVector neighbors of this SubDomain from the x Vector
+        // TODO dies auch async machen?
+        std::vector<SubVectorValues_future> subXv_fs;
+        subXv_fs.reserve(subA.dependencies.size() );
+        for (std::set<int>::iterator it = subA.dependencies.begin();
+                it != subA.dependencies.end(); ++it)
+        {
+            subXv_fs.push_back( subXs.at(*it).subValues_f );
+        }
+
+        // make the async call
+        using hpx::lcos::local::dataflow;
+        subY.subValues_f = dataflow(
+                hpx::launch::async, unwrapper,
+                subY.subValues_f,
+                subA.subMatrix_f,
+                subXv_fs
+            );
+
     }
 
-  return 0;
+    return 0;
 }
 
+// wrapper function
 int ComputeSPMV(const  SparseMatrix & A, Vector & x, Vector & y) {
-  assert(x.localLength>=A.localNumberOfColumns); // Test vector lengths
+  // Test vector lengths
+  assert(x.localLength>=A.localNumberOfColumns);
   assert(y.localLength>=A.localNumberOfRows);
 
   A.isSpmvOptimized = true;
   
   // version async
-  //return ComputeSPMV_async(A, x, y).wait(), 0;
+  /*return ComputeSPMV_async(A, x, y).wait(), 0;*/
 
-  //Version async inc. sub domains
+  // Version async inc. sub domains
   return ComputeSPMV_sub_async(A, x, y);
 
 }

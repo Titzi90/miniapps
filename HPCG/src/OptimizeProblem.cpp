@@ -48,66 +48,71 @@ int OptimizeProblem(SparseMatrix & A,
 {
 
 // This function can be used to completely transform any part of the data structures.
-// Right now it does nothing, so compiling with a check for unused variables results in complaints
-
 #ifndef HPCG_NOHPX
-    //TODO DEBUG output
 
 #ifdef HPCG_DEBUG
     std::cerr << "start opti problem" << std::endl;
 #endif
 
 
-// extract datas
-int const nx = A.geom->nx;    // number points in x direction for the locality
-int const ny = A.geom->ny;    // number points in y direction for the locality
-int const nz = A.geom->nz;    // number points in z direction for the locality
+/*************** extract and calculate geometry datas *************************/
+
+// number of points in [x,y,z]-direction per locality
+int const nx = A.geom->nx;
+int const ny = A.geom->ny;
+int const nz = A.geom->nz;
 
 // calc local subdomain geometry
 // we need at least 16 points in each direction for MG
 // TODO make it more dynamic
 assert(nx%NL == 0 && ny%NL == 0 && nz%NL == 0);
-int nlpx = nx / NL;         // number of local sub prozessors in x direction.
-int nlpy = ny / NL;         // number of local sub prozessors in y direction.
-int nlpz = nz / NL;         // number of local sub prozessors in z direction.
-int nlp  = nlpx * nlpy * nlpz;  // number of locasl sub prozessors
-int nlx  = NL;              // number of local points in x direction
-int nly  = NL;              // number of local points in y direction
-int nlz  = NL;              // number of local points in z direction
-local_int_t localNumberRows = nlx*nly*nlz;
+//  number of SubDomains in [x,y,z]-direction in the locality
+int const numSubDomainsX = nx / NL;
+int const numSubDomainsY = ny / NL;
+int const numSubDomainsZ = nz / NL;
+int const numSubDomains  = numSubDomainsX * numSubDomainsY * numSubDomainsZ;
 
-// create an allocate Sub Domains
-A.optimizationData = new std::vector<SubDomain>();
-b.optimizationData = new std::vector<SubVector>();
-x.optimizationData = new std::vector<SubVector>();
-data.r.optimizationData = new std::vector<SubVector>();
-data.z.optimizationData = new std::vector<SubVector>();
-data.p.optimizationData = new std::vector<SubVector>();
+// number of points in [x,y,z]-direction per SubDomain
+int const numSubPointsX = NL;
+int const numSubPointsY = NL;
+int const numSubPointsZ = NL;
+int const numSubPoints  = numSubPointsX*numSubPointsY*numSubPointsZ;
+
+// create and allocate Sub Domain and SubVector
+A.optimizationData       = new std::vector<SubDomain>();
+b.optimizationData       = new std::vector<SubVector>();
+x.optimizationData       = new std::vector<SubVector>();
+data.r.optimizationData  = new std::vector<SubVector>();
+data.z.optimizationData  = new std::vector<SubVector>();
+data.p.optimizationData  = new std::vector<SubVector>();
 data.Ap.optimizationData = new std::vector<SubVector>();
 
-std::vector<SubDomain> & subDomains=
+std::vector<SubDomain> & subDomains =
     *static_cast<std::vector<SubDomain>* >(A.optimizationData);
-std::vector<SubVector> & subBs=
+std::vector<SubVector> & subBs =
     *static_cast<std::vector<SubVector>* >(b.optimizationData);
-std::vector<SubVector> & subXs=
+std::vector<SubVector> & subXs =
     *static_cast<std::vector<SubVector>* >(x.optimizationData);
-std::vector<SubVector> & subRs=
+std::vector<SubVector> & subRs =
     *static_cast<std::vector<SubVector>* >(data.r.optimizationData);
-std::vector<SubVector> & subZs=
+std::vector<SubVector> & subZs =
     *static_cast<std::vector<SubVector>* >(data.z.optimizationData);
-std::vector<SubVector> & subPs=
+std::vector<SubVector> & subPs =
     *static_cast<std::vector<SubVector>* >(data.p.optimizationData);
-std::vector<SubVector> & subAps=
+std::vector<SubVector> & subAps =
     *static_cast<std::vector<SubVector>* >(data.Ap.optimizationData);
 
-subDomains.reserve(nlp);
-subBs.reserve(nlp);
-subXs.reserve(nlp);
-subRs.reserve(nlp);
-subZs.reserve(nlp);
-subPs.reserve(nlp);
-subAps.reserve(nlp);
+subDomains.reserve(numSubDomains);
+subBs.reserve(numSubDomains);
+subXs.reserve(numSubDomains);
+subRs.reserve(numSubDomains);
+subZs.reserve(numSubDomains);
+subPs.reserve(numSubDomains);
+subAps.reserve(numSubDomains);
 
+/*
+ * TODO MG not implemented yet -> doen't need this yet
+ * TODO check if everything is correct (variabel names ...)
 //create subDomains for MultiGrid
 SparseMatrix* Acur = &A;
 while (0 != Acur->Ac){
@@ -118,49 +123,53 @@ while (0 != Acur->Ac){
     Acur->mgData->Axf->optimizationData = new std::vector<SubVector>();
 
     static_cast<std::vector<SubDomain>* >(Acur->Ac->optimizationData)
-        ->reserve(nlp);
+        ->reserve(numSubDomains);
     static_cast<std::vector<SubF2C>* >(Acur->mgData->optimizationData)
-        ->reserve(nlp);
+        ->reserve(numSubDomains);
     static_cast<std::vector<SubVector>* >(Acur->mgData->rc->optimizationData)
-        ->reserve(nlp);
+        ->reserve(numSubDomains);
     static_cast<std::vector<SubVector>* >(Acur->mgData->xc->optimizationData)
-        ->reserve(nlp);
+        ->reserve(numSubDomains);
     static_cast<std::vector<SubVector>* >(Acur->mgData->Axf->optimizationData)
-        ->reserve(nlp);
+        ->reserve(numSubDomains);
 
     Acur = Acur->Ac;
 }
+*/
 
 // initialize SubDomains and SubVectors
-//TODO parallel ACHTUNG ich verlasse mich auf reinfolge der subdomains
-//->veilleicht eine map verwenden
-for (int i=0; i<nlp; ++i){
+for (int subID=0; subID<numSubDomains; ++subID){
     SubDomain subDomain;
 
-    //compute x y z rank of subDomain/Vector (index i --> cordinate x,y,z)
-    int & lpix = subDomain.lpix;
-    int & lpiy = subDomain.lpiy;
-    int & lpiz = subDomain.lpiz;
+    //compute x y z rank of subDomain/-Vector (index i --> cordinate x,y,z)
+    int & subIDx = subDomain.subIDx;
+    int & subIDy = subDomain.subIDy;
+    int & subIDz = subDomain.subIDz;
 
-    lpiz = i/(nlpx*nlpy);
-    lpiy = (i-lpiz*nlpx*nlpy)/nlpx;
-    lpix = i%nlpx;
+    subDomain.subID = subID;
+    subIDz = subID / (numSubDomainsX*numSubDomainsY);
+    subIDy = (subID-subIDz*numSubDomainsX*numSubDomainsY) / numSubDomainsX;
+    subIDx = subID % numSubDomainsX;
 
-    // inizalize data pointers for Matrix
-    MatrixValues matrix;
-    std::vector<double*> & matrixValues = matrix.values;
-    std::vector<double*> & matrixDiagonal = matrix.diagonal;
-    std::vector<global_int_t*> & mtxIndG = matrix.indG;
-    std::vector<local_int_t*> & mtxIndLoc = matrix.indLoc;
-    std::vector<char*> & nonzerosInRow = matrix.nonzerosInRow;
+    assert(subID == index(subIDx, subIDy, subIDz,
+                          numSubDomainsX, numSubDomainsY, numSubDomainsZ) );
 
-    matrixValues.reserve(localNumberRows);
-    matrixDiagonal.reserve(localNumberRows);
-    mtxIndG.reserve(localNumberRows);
-    mtxIndLoc.reserve(localNumberRows);
-    nonzerosInRow.reserve(localNumberRows);
+    // allocate data pointers for Matrix
+    SubMatrix subMatrix;
 
-    // .. for vector
+    std::vector<double*> & subValues = subMatrix.values;
+    std::vector<double*> & matrixDiagonal = subMatrix.diagonal;
+    std::vector<global_int_t*> & mtxIndG = subMatrix.indG;
+    std::vector<local_int_t*> & mtxIndLoc = subMatrix.indLoc;
+    std::vector<char*> & nonzerosInRow = subMatrix.nonzerosInRow;
+
+    subValues.reserve(numSubPoints);
+    matrixDiagonal.reserve(numSubPoints);
+    mtxIndG.reserve(numSubPoints);
+    mtxIndLoc.reserve(numSubPoints);
+    nonzerosInRow.reserve(numSubPoints);
+
+    // allocate data pointers for vector
     std::vector<double*> subBv;
     std::vector<double*> subXv;
     std::vector<double*> subRv;
@@ -168,162 +177,98 @@ for (int i=0; i<nlp; ++i){
     std::vector<double*> subPv;
     std::vector<double*> subApv;
 
-    subBv.reserve(localNumberRows);
-    subXv.reserve(localNumberRows);
-    subRv.reserve(localNumberRows);
-    subZv.reserve(localNumberRows);
-    subPv.reserve(localNumberRows);
-    subApv.reserve(localNumberRows);
+    subBv.reserve(numSubPoints);
+    subXv.reserve(numSubPoints);
+    subRv.reserve(numSubPoints);
+    subZv.reserve(numSubPoints);
+    subPv.reserve(numSubPoints);
+    subApv.reserve(numSubPoints);
 
-    // compute pointers from SubMatrixes/SubVectors to local(ety) matrix/vectors
-    for (local_int_t iz=0; iz<nlz; iz++) {
-        global_int_t giz = lpiz*nlz+iz;
-        for (local_int_t iy=0; iy<nly; iy++) {
-            global_int_t giy = lpiy*nly+iy;
-            for (local_int_t ix=0; ix<nlx; ix++) {
-                global_int_t gix = lpix*nlx+ix;
+    // compute pointers from SubMatrixes/SubVectors to localety matrix/vectors
+    for (local_int_t iSz=0; iSz<numSubPointsZ; iSz++) {
+        local_int_t iLz = subIDz*numSubPointsZ+iSz;
+        for (local_int_t iSy=0; iSy<numSubPointsY; iSy++) {
+            local_int_t iLy = subIDy*numSubPointsY+iSy;
+            for (local_int_t iSx=0; iSx<numSubPointsX; iSx++) {
+                local_int_t iLx = subIDx*numSubPointsX+iSx;
 
-                local_int_t currentLocalSubRow = iz*nlx*nly+iy*nlx+ix;
-                global_int_t currentLocaletyRow = giz*nx*ny+giy*nx+gix;
+                local_int_t currentSubRow = iSz*numSubPointsX*numSubPointsY
+                                          + iSy*numSubPointsX
+                                          + iSx;
+                local_int_t currentLocaletyRow = iLz*nx*ny
+                                               + iLy*nx
+                                               + iLx;
 
-                matrixValues.push_back(A.matrixValues[currentLocaletyRow]);
+                // set Matrix links to original data
+                subValues.push_back(A.matrixValues[currentLocaletyRow]);
                 matrixDiagonal.push_back(A.matrixDiagonal[currentLocaletyRow]);
                 mtxIndG.push_back(A.mtxIndG[currentLocaletyRow]);
                 mtxIndLoc.push_back(A.mtxIndL[currentLocaletyRow]);
                 nonzerosInRow.push_back(&A.nonzerosInRow[currentLocaletyRow]);
 
+                // set Vector links to original data
                 subBv.push_back(&b.values[currentLocaletyRow]);
                 subXv.push_back(&x.values[currentLocaletyRow]);
                 subRv.push_back(&data.r.values[currentLocaletyRow]);
                 subZv.push_back(&data.z.values[currentLocaletyRow]);
                 subPv.push_back(&data.p.values[currentLocaletyRow]);
                 subApv.push_back(&data.Ap.values[currentLocaletyRow]);
+
+                // collecting all dependencies of the SubDomains
+                // TODO save symetris
+                for (int i=0; i!=*nonzerosInRow[currentSubRow]; ++i){
+                    subDomain.dependencies.insert( belongsTo(
+                                mtxIndG.at(currentSubRow)[i],
+                                numSubDomainsX, numSubDomainsY, numSubDomainsZ,
+                                numSubPointsX, numSubPointsY, numSubPointsZ
+                                ) );
+                }
             }
         }
     }
 
-    // save gernerl geometry information to SubDomain on uper level (A)
-    subDomain.localNumberRows = localNumberRows;
-    subDomain.nlpx = nlpx;
-    subDomain.nlpy = nlpy;
-    subDomain.nlpz = nlpz;
-    subDomain.nlp  = nlp ;
-    subDomain.nlx  = nlx ;
-    subDomain.nly  = nly ;
-    subDomain.nlz  = nlz ;
+    // save gernerl geometry information to SubDomain (on uper level (A) )
+    subDomain.numSubDomainsX = numSubDomainsX;
+    subDomain.numSubDomainsY = numSubDomainsY;
+    subDomain.numSubDomainsZ = numSubDomainsZ;
+    subDomain.numSubDomains  = numSubDomains ;
+    subDomain.numSubPointsX  = numSubPointsX ;
+    subDomain.numSubPointsY  = numSubPointsY ;
+    subDomain.numSubPointsZ  = numSubPointsZ ;
+    subDomain.numSubPoints   = numSubPoints  ;
     //save values in furtures and in optimizationData
-    subDomain.matrixValues = hpx::make_ready_future(std::move(matrix));
+    subDomain.subMatrix_f = hpx::make_ready_future(std::move(subMatrix));
 
-    // save values to vector
+    //save geometry information and data to SubVectors
     SubVector subB;
     SubVector subX;
     SubVector subR;
     SubVector subZ;
     SubVector subP;
     SubVector subAp;
+    // length
+    subB.subLength = numSubPoints;
+    subX.subLength = numSubPoints;
+    subR.subLength = numSubPoints;
+    subZ.subLength = numSubPoints;
+    subP.subLength = numSubPoints;
+    subAp.subLength = numSubPoints;
+    // ID
+    subB.subID = subID;
+    subX.subID = subID;
+    subR.subID = subID;
+    subZ.subID = subID;
+    subP.subID = subID;
+    subAp.subID = subID;
+    // Values
+    subB.subValues_f = hpx::make_ready_future(std::move(subBv));
+    subX.subValues_f = hpx::make_ready_future(std::move(subXv));
+    subR.subValues_f = hpx::make_ready_future(std::move(subRv));
+    subZ.subValues_f = hpx::make_ready_future(std::move(subZv));
+    subP.subValues_f = hpx::make_ready_future(std::move(subPv));
+    subAp.subValues_f = hpx::make_ready_future(std::move(subApv));    
 
-    subB.localLength = localNumberRows;
-    subX.localLength = localNumberRows;
-    subR.localLength = localNumberRows;
-    subZ.localLength = localNumberRows;
-    subP.localLength = localNumberRows;
-    subAp.localLength = localNumberRows;
-    subB.localetyValues = b.values;
-    subX.localetyValues = x.values;
-    subR.localetyValues = data.r.values;
-    subZ.localetyValues = data.z.values;
-    subP.localetyValues = data.p.values;
-    subAp.localetyValues = data.Ap.values;
-    subB.values_f = hpx::make_ready_future(std::move(subBv));
-    subX.values_f = hpx::make_ready_future(std::move(subXv));
-    subR.values_f = hpx::make_ready_future(std::move(subRv));
-    subZ.values_f = hpx::make_ready_future(std::move(subZv));
-    subP.values_f = hpx::make_ready_future(std::move(subPv));
-    subAp.values_f = hpx::make_ready_future(std::move(subApv));
-
-    //calucalting and set color level
-    subB.colorIndex = 4 * lpiz%2 + 2 * lpiy%2 + 1 * lpix%2;
-    /*
-    if (lpiz%2 == 0){
-        if (lpiy%2 == 0){
-            if (lpix%2 == 0){
-                subB.colorIndex  = 0;
-                subX.colorIndex  = 0;
-                subR.colorIndex  = 0;
-                subZ.colorIndex  = 0;
-                subP.colorIndex  = 0;
-                subAp.colorIndex = 0;
-            }
-            else{
-                subB.colorIndex  = 1;
-                subX.colorIndex  = 1;
-                subR.colorIndex  = 1;
-                subZ.colorIndex  = 1;
-                subP.colorIndex  = 1;
-                subAp.colorIndex = 1;
-            }
-        }
-        else{
-            if (lpix%2 == 0){
-                subB.colorIndex  = 2;
-                subX.colorIndex  = 2;
-                subR.colorIndex  = 2;
-                subZ.colorIndex  = 2;
-                subP.colorIndex  = 2;
-                subAp.colorIndex = 2;
-            }
-            else{
-                subB.colorIndex  = 3;
-                subX.colorIndex  = 3;
-                subR.colorIndex  = 3;
-                subZ.colorIndex  = 3;
-                subP.colorIndex  = 3;
-                subAp.colorIndex = 3;
-            }
-        }
-    }
-    else{
-        if (lpiy%2 == 0){
-            if (lpix%2 == 0){
-                subB.colorIndex  = 4;
-                subX.colorIndex  = 4;
-                subR.colorIndex  = 4;
-                subZ.colorIndex  = 4;
-                subP.colorIndex  = 4;
-                subAp.colorIndex = 4;
-            }
-            else{
-                subB.colorIndex  = 5;
-                subX.colorIndex  = 5;
-                subR.colorIndex  = 5;
-                subZ.colorIndex  = 5;
-                subP.colorIndex  = 5;
-                subAp.colorIndex = 5;
-            }
-        }
-        else{
-            if (lpix%2 == 0){
-                subB.colorIndex  = 6;
-                subX.colorIndex  = 6;
-                subR.colorIndex  = 6;
-                subZ.colorIndex  = 6;
-                subP.colorIndex  = 6;
-                subAp.colorIndex = 6;
-            }
-            else{
-                subB.colorIndex  = 7;
-                subX.colorIndex  = 7;
-                subR.colorIndex  = 7;
-                subZ.colorIndex  = 7;
-                subP.colorIndex  = 7;
-                subAp.colorIndex = 7;
-            }
-        }
-    }
-    */
-
-    //save in SubParts in Loacality Vector
-    // TODO wenn map dann inert
+    // save the SubDomain and SubVectors in the optimizationData structure
     subDomains.push_back( std::move(subDomain) );
     subBs.push_back( std::move(subB) );
     subXs.push_back( std::move(subX) );
@@ -332,33 +277,35 @@ for (int i=0; i<nlp; ++i){
     subPs.push_back( std::move(subP) );
     subAps.push_back( std::move(subAp) );
 
-
+/**************MULTIGRID*******************************************************/
+/* TODO anpassen auf neue Daten Struktur
     // go throu MG Levels
     SparseMatrix* Acur = &A;
-    local_int_t nlxc = nlx;
-    local_int_t nlyc = nly;
-    local_int_t nlzc = nlz;
+    local_int_t numSubPointsxc = numSubPointsx;
+    local_int_t numSubPointsyc = numSubPointsy;
+    local_int_t numSubPointszc = numSubPointsz;
 
 
     while (0 != Acur->Ac){
-        nlxc /= 2;
-        nlyc /= 2;
-        nlzc /= 2;
-        local_int_t numberCourseRows = nlxc*nlyc*nlzc;
-        assert(nlxc > 0 && nlyc > 0 && nlzc > 0);
+        // TODO dependencie matrix for MG
+        numSubPointsxc /= 2;
+        numSubPointsyc /= 2;
+        numSubPointszc /= 2;
+        local_int_t numberCourseRows = numSubPointsxc*numSubPointsyc*numSubPointszc;
+        assert(numSubPointsxc > 0 && numSubPointsyc > 0 && numSubPointszc > 0);
 
         SubDomain subCDomain;
         SubF2COperator subF2C;
 
         // inizalize data pointers Martix
-        MatrixValues cMatrix;
-        std::vector<double*> & cmatrixValues   = cMatrix.values;
+        SubMatrix cMatrix;
+        std::vector<double*> & csubMatrix   = cMatrix.values;
         std::vector<double*> & cmatrixDiagonal = cMatrix.diagonal;
         std::vector<global_int_t*> & cMtxIndG  = cMatrix.indG;
         std::vector<local_int_t*> & cMtxIndLoc = cMatrix.indLoc;
         std::vector<char*> & cNonzerosInRow    = cMatrix.nonzerosInRow;
 
-        cmatrixValues.reserve(numberCourseRows);
+        csubMatrix.reserve(numberCourseRows);
         cmatrixDiagonal.reserve(numberCourseRows);
         cMtxIndG.reserve(numberCourseRows);
         cMtxIndLoc.reserve(numberCourseRows);
@@ -378,18 +325,18 @@ for (int i=0; i<nlp; ++i){
         subF2CrOp.reserve(numberCourseRows);
 
         // compute pointers from SubMatrixes/SubVectors to local(ety) matrix/vectors
-        for (local_int_t iz=0; iz<nlzc; iz++) {
-            global_int_t giz = lpiz*nlzc+iz;
-            for (local_int_t iy=0; iy<nlyc; iy++) {
-                global_int_t giy = lpiy*nlyc+iy;
-                for (local_int_t ix=0; ix<nlxc; ix++) {
-                    global_int_t gix = lpix*nlxc+ix;
+        for (local_int_t iz=0; iz<numSubPointszc; iz++) {
+            global_int_t giz = subIDz*numSubPointszc+iz;
+            for (local_int_t iy=0; iy<numSubPointsyc; iy++) {
+                global_int_t giy = subIDy*numSubPointsyc+iy;
+                for (local_int_t ix=0; ix<numSubPointsxc; ix++) {
+                    global_int_t gix = subIDx*numSubPointsxc+ix;
 
-                    local_int_t currentLocalSubRow  = iz*nlxc*nlyc+iy*nlxc+ix;
+                    local_int_t currentLocalSubRow  = iz*numSubPointsxc*numSubPointsyc+iy*numSubPointsxc+ix;
                     global_int_t currentLocaletyRow = giz*nx*ny+giy*nx+gix;
 
-                    cmatrixValues.push_back(
-                        Acur->matrixValues[currentLocaletyRow]);
+                    csubMatrix.push_back(
+                        Acur->subMatrix[currentLocaletyRow]);
                     cmatrixDiagonal.push_back(
                         Acur->matrixDiagonal[currentLocaletyRow]);
                     cMtxIndG.push_back(
@@ -414,14 +361,14 @@ for (int i=0; i<nlp; ++i){
 
         // save gernerl geometry information to SubDomain
         subCDomain.localNumberRows = numberCourseRows;
-        subCDomain.nlpx = nlpx;
-        subCDomain.nlpy = nlpy;
-        subCDomain.nlpz = nlpz;
-        subCDomain.nlp  = nlp ;
-        subCDomain.nlx  = nlxc;
-        subCDomain.nly  = nlyc;
-        subCDomain.nlz  = nlzc;
-        subCDomain.matrixValues = hpx::make_ready_future(std::move(cMatrix));
+        subCDomain.nnumSubDomainsX = nnumSubDomainsX;
+        subCDomain.numSubDomainsY = numSubDomainsY;
+        subCDomain.numSubDomainsZ = numSubDomainsZ;
+        subCDomain.numSubDomains  = numSubDomains ;
+        subCDomain.numSubPointsX  = numSubPointsxc;
+        subCDomain.numSubPointsY  = numSubPointsyc;
+        subCDomain.numSubPointsZ  = numSubPointszc;
+        subCDomain.subMatrix = hpx::make_ready_future(std::move(cMatrix));
 
         // save values to vector
         SubVector subR;
@@ -434,12 +381,11 @@ for (int i=0; i<nlp; ++i){
         subR.localetyValues = Acur->mgData->rc->values;
         subX.localetyValues = Acur->mgData->xc->values;
         subAxf.localetyValues = Acur->mgData->Axf->values;
-        subR.values_f = hpx::make_ready_future(std::move(subRv));
-        subX.values_f = hpx::make_ready_future(std::move(subXv));
-        subAxf.values_f = hpx::make_ready_future(std::move(subAxfv));
+        subR.subValues_f = hpx::make_ready_future(std::move(subRv));
+        subX.subValues_f = hpx::make_ready_future(std::move(subXv));
+        subAxf.subValues_f = hpx::make_ready_future(std::move(subAxfv));
 
         // save in locality Vector
-        //TODO map ersetzen
         static_cast< std::vector<SubDomain>* >(Acur->Ac->optimizationData)
             ->push_back(std::move(subCDomain));
 
@@ -455,112 +401,11 @@ for (int i=0; i<nlp; ++i){
 
         Acur = Acur->Ac;
     }
-}
-
-// set naighbour futures to Vectors
-//TODO more localetys
-//loop ofer all elements
-for (int x=0; x<nlpx; ++x){
-    for (int y=0; y<nlpy; ++y){
-        for (int z=0; z<nlpz; ++z){
-
-            int i = index(x,y,z,nlpx,nlpy,nlpz);
-
-            //loop over neighbors
-            for (int dx=-1; dx<=1; ++dx){
-                int xx = x + dx;
-                for (int dy=-1; dy<=1; ++dy){
-                    int yy = y + dy;
-                    for (int dz=-1; dz<=1; ++dz){
-                        int zz = z + dz;
-
-                        //check if neighbor is a legal one
-                        if (xx<0 || xx>=nlpx ||
-                            yy<0 || yy>=nlpy ||
-                            zz<0 || zz>=nlpz)
-                        {
-                            //no neighbor -> set reddy dummy
-                            subBs[i].neighbourhood[dx+1][dy+1][dz+1] =
-                                &dummyNeighbor;
-                            subXs[i].neighbourhood[dx+1][dy+1][dz+1] =
-                                &dummyNeighbor;
-                            subRs[i].neighbourhood[dx+1][dy+1][dz+1] =
-                                &dummyNeighbor;
-                            subZs[i].neighbourhood[dx+1][dy+1][dz+1] =
-                                &dummyNeighbor;
-                            subPs[i].neighbourhood[dx+1][dy+1][dz+1] =
-                                &dummyNeighbor;
-                            subAps[i].neighbourhood[dx+1][dy+1][dz+1] =
-                                &dummyNeighbor;
-
-                            // going throw MG
-                            SparseMatrix* Acur = &A;
-                            while (0 != Acur->Ac){
-                                (*static_cast<std::vector<SubVector>*>(
-                                        Acur->mgData->rc->optimizationData))
-                                        [i].neighbourhood[dx+1][dy+1][dz+1] =
-                                        &dummyNeighbor;
-                                (*static_cast<std::vector<SubVector>*>(
-                                        Acur->mgData->xc->optimizationData))
-                                        [i].neighbourhood[dx+1][dy+1][dz+1] =
-                                        &dummyNeighbor;
-                                (*static_cast<std::vector<SubVector>*>(
-                                        Acur->mgData->Axf->optimizationData))
-                                        [i].neighbourhood[dx+1][dy+1][dz+1] =
-                                        &dummyNeighbor;
-                                Acur = Acur->Ac;
-                            }
-                        }
-                        else{
-                            int ii = index(xx,yy,zz,nlpx,nlpy,nlpz);
-                            // link to neighbor values
-                            subBs[i].neighbourhood[dx+1][dy+1][dz+1] =
-                                                   &subBs[ii];
-                            subXs[i].neighbourhood[dx+1][dy+1][dz+1] =
-                                                   &subXs[ii];
-                            subRs[i].neighbourhood[dx+1][dy+1][dz+1] =
-                                                   &subRs[ii];
-                            subZs[i].neighbourhood[dx+1][dy+1][dz+1] =
-                                                   &subZs[ii];
-                            subPs[i].neighbourhood[dx+1][dy+1][dz+1] =
-                                &subPs[ii];
-                            subAps[i].neighbourhood[dx+1][dy+1][dz+1] =
-                                &subAps[ii];
-
-                            // going throw MG
-                            SparseMatrix* Acur = &A;
-                            while (0 != Acur->Ac){
-                                (*static_cast<std::vector<SubVector>*>(
-                                        Acur->mgData->rc->optimizationData))
-                                        [i].neighbourhood[dx+1][dy+1][dz+1] =
-                                        &(*static_cast<std::vector<SubVector>*>(
-                                            Acur->mgData->rc->optimizationData))
-                                            [ii];
-                                (*static_cast<std::vector<SubVector>*>(
-                                        Acur->mgData->xc->optimizationData))
-                                        [i].neighbourhood[dx+1][dy+1][dz+1] =
-                                        &(*static_cast<std::vector<SubVector>*>(
-                                            Acur->mgData->xc->optimizationData))
-                                            [ii];
-                                (*static_cast<std::vector<SubVector>*>(
-                                        Acur->mgData->Axf->optimizationData))
-                                        [i].neighbourhood[dx+1][dy+1][dz+1] =
-                                        &(*static_cast<std::vector<SubVector>*>(
-                                            Acur->mgData->Axf->optimizationData))
-                                        [ii];
-
-                                Acur = Acur->Ac;
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
+*/
 }
 
 return 0;
-#else
-  return 0;
-#endif
+#else   // HPCG_NOHPX
+return 0;
+#endif  // HPCG_NOHPX
 }

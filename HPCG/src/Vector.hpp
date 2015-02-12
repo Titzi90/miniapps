@@ -87,6 +87,18 @@ inline void FillRandomVector(Vector & v) {
   return;
 }
 /*!
+  Fill the input vector with consstant values.
+
+  @param[in] v  Input vector
+  @param[in] val value to set
+ */
+inline void FillVector(Vector & v, double const val) {
+  local_int_t localLength = v.localLength;
+  double * vv = v.values;
+  for (int i=0; i<localLength; ++i) vv[i] = val;
+  return;
+}
+/*!
   Copy input vector to output vector.
 
   @param[in] v Input vector
