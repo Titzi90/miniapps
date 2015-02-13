@@ -217,7 +217,9 @@ if(0 == hpx::get_locality_id())
   CERR << "init test ok!" <<ENDL;
 #endif
 
-CERR << "We have " << subXs.size() << " sub domains" << ENDL;
+  std::vector<SubVector>  & subBs =
+        *static_cast< std::vector<SubVector>* >(b.optimizationData);
+CERR << "We have " << subBs.size() << " sub domains" << ENDL;
 
 #endif
 }
@@ -249,69 +251,70 @@ for (local_int_t i=0; i<x.localLength; ++i){
 }
 
 {/************SPMV BENCHMARK****************************************************/
-//TODO überarbeiten 
 
-// no dependencis 
-/*
-{
-  CERR << "starting SPMV benchmark with no dependencis" <<ENDL;
+{// no dependencis
+  CERR << "starting SPMV benchmark with no dependencis" << ENDL;
+
+  double const BENCHTIME = 5;   // the benchmark should run at least for this time
+  int const REPEAT = 10;        // the benchmark should run at least for this number of sets
+  double time_ref = 0;          // time the benchmark takes
+  double time_opt = 0;          // time the benchmark takes
+  int repeat_ref = REPEAT;      // how offent the benchmark runs
+  int repeat_opt = REPEAT;      // how offent the benchmark runs
 
   // recerence
-  int repeat_ref = 4;
-  double ref_time = 0;
-  for (; ref_time<1; repeat_ref*=2){
-    ref_time = mytimer();
+  for (; time_ref<BENCHTIME; repeat_ref*=2){
+    time_ref = mytimer();
     for(int r=0; r<repeat_ref; ++r){
       ComputeSPMV_ref(A_ref, b_ref, x_ref);
     }
-    ref_time = mytimer() - ref_time;
+    time_ref = mytimer() - time_ref;
   }
   repeat_ref /= 2;
-  ref_time /= repeat_ref;
-  COUT << ref_time << " sec. average (saple size: " << repeat_ref
-            << ") non optimized runtime" << ENDL;
+  time_ref /= repeat_ref;
+  COUT << time_ref << " sec. average (saple size: " << repeat_ref
+       << ") non optimized runtime" << ENDL;
 
   //optimized version
 #ifndef HPCG_NOHPX
   // define hpx countesrs and timer
-  int repeat_opt = 4;
-  double opt_time = 0;
-  hpx::performance_counters::performance_counter idleRate_counter (
-          "/threads{localiti#0/total}/idle-rate");
-  hpx::performance_counters::performance_counter thread_counter (
-          "/threads{localiti#0/total}/count/cumulative");
-  int idleRate =0;
-  int threads =0;
+  // TODO warum gehn die nemmer?
+  //hpx::performance_counters::performance_counter idleRate_counter (
+          //"/threads{localiti#0/total}/idle-rate");
+  //hpx::performance_counters::performance_counter thread_counter (
+          //"/threads{localiti#0/total}/count/cumulative");
+  //int idleRate =0;
+  //int threads =0;
   double thread_time =0.;
 
-  for (; opt_time<1; repeat_opt*=2){
-    idleRate_counter.reset_sync();
-    thread_counter.reset_sync();
-    opt_time =mytimer();
+  for (; time_opt<BENCHTIME; repeat_opt*=2){
+    //idleRate_counter.reset_sync();
+    //thread_counter.reset_sync();
+    time_opt =mytimer();
     for(int r=0; r<repeat_opt; ++r){
       ComputeSPMV    (A   , b     , x    );
-      hpx::wait_all(when_vec(x));
+      when_vec(x).get();    //wait to finish all computation
     }
-    opt_time = mytimer() - opt_time;
-    idleRate = idleRate_counter.get_value_sync<int>();
-    threads   = thread_counter.get_value_sync<int>();
+    time_opt = mytimer() - time_opt;
+    //idleRate = idleRate_counter.get_value_sync<int>();
+    //threads   = thread_counter.get_value_sync<int>();
   }
   repeat_opt /= 2;
-  thread_time = 1000. * opt_time/threads;
-  opt_time /= repeat_opt;
-  COUT << opt_time << " sec. average (saple size: " << repeat_opt
-            << ") optimized hpx runtime (inc. barriers)" << ENDL;
-  COUT << 0.01 * idleRate << "% total idle rate"   << ENDL;
-  COUT << threads << " total number of hpx threads" << ENDL;
-  COUT << thread_time << " ms work per thread" << ENDL;
+  //thread_time = 1000. * time_opt/threads;
+  time_opt /= repeat_opt;
+  COUT << time_opt << " sec. average (saple size: " << repeat_opt
+       << ") optimized hpx runtime (inc. barriers)" << ENDL;
+  //COUT << 0.01 * idleRate << "% total idle rate"   << ENDL;
+  //COUT << threads << " total number of hpx threads" << ENDL;
+  //COUT << thread_time << " ms work per thread" << ENDL;
   
 #endif
   }
-*/
 
-// one dependencis 
+//TODO überarbeiten 
 /*
-  {
+  {// with dependencis 
+  ////TODO dependencis in SPMV?
   CERR << "starting SPMV benchmark with one dependenci" <<ENDL;
 
   // recerence
