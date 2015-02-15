@@ -70,7 +70,7 @@ int ComputeSYMGS( const SparseMatrix & A, const Vector & x, Vector & y) {
 #include <algorithm>
 #include "OptimizeProblem.hpp"
 
-
+/**********ONE STEP VERSION****************************************************/
 
 // Performe one Gauss Seidel stepp
 // ele is the element in the subY to be calculate
@@ -123,10 +123,13 @@ SubVectorValues subSYMGS(SubMatrix const & subMtx,
 /**
  * This version of the symetic Gaus Siedel solver make use of the sub domains
  * and using HPX to work on each sub Domain asyncron
+ * Moreover it computes the secound Symetic Gaus Seidel step 
+ * just inside each SubDomain
  */
 int ComputeSYMGS_sub_async(SparseMatrix const & A,
                            Vector const & rhs ,
-                           Vector & y)
+                           Vector & y
+                          )
 {
 
 #ifdef HPCG_DEBUG
@@ -188,7 +191,270 @@ int ComputeSYMGS_sub_async(SparseMatrix const & A,
     return 0;
 }
 
-// wrapper function
+/**********TWO STEP VERSION****************************************************/
+
+//forward sweep
+SubVectorValues subSYMGS_forward(SubMatrix const & subMtx,
+                                 SubVectorValues const & subRHS,
+                                 double const * yValus,
+                                 SubVectorValues  subY    //TODO warum keine Referenz möglich?
+                                )
+{
+    for (size_t i=0; i<subY.size(); ++i)
+    {
+        GSStepper(subMtx, subRHS, yValus, subY, i);
+    }
+    return subY;
+}
+
+//back sweep
+SubVectorValues subSYMGS_revers(SubMatrix const & subMtx,
+                                SubVectorValues const & subRHS,
+                                double const * yValus,
+                                SubVectorValues  subY    //TODO warum keine Referenz möglich?
+                               )
+{
+    for (local_int_t i=subY.size()-1; i>=0; --i)
+    {
+        GSStepper(subMtx, subRHS, yValus, subY, i);
+    }
+
+    return subY;
+}
+
+
+/**
+ * This version of the symetic Gaus Siedel solver make use of the sub domains
+ * and using HPX to work on each sub Domain asyncron
+ * Morover it computes the second step of the Symetic GausSeidel after
+ * all depending Subdomains are finished with first step
+ * and calls the secound sweap in same order
+ */
+int ComputeSYMGS_sub_async_twostep(SparseMatrix const & A,
+                                   Vector const & rhs ,
+                                   Vector & y
+                                  )
+{
+
+#ifdef HPCG_DEBUG
+    std::cout << "using SYMGS_sub_async_twosetp" << std::endl;
+#endif
+    //TODO more localytsy
+
+    std::vector<SubDomain>  & subAs =
+        *static_cast<std::vector<SubDomain>* >(A.optimizationData);
+    std::vector<SubVector>  & subRHSs =
+        *static_cast<std::vector<SubVector>* >(rhs.optimizationData);
+    std::vector<SubVector>& subYs =
+        *static_cast<std::vector<SubVector>* >(y.optimizationData);
+
+    // first loop over all subdomains
+    for(size_t i=0; i<subYs.size(); ++i)
+    {
+        SubVector & subY   = subYs.at(i);
+        SubVector & subRHS = subRHSs.at(i);
+        SubDomain & subA   = subAs.at(i);
+
+        HPX_ASSERT(subRHS.subLength == subY.subLength);
+
+        // Vector of all SubVector neighbors of this SubDomain from the x Vector
+        std::vector<SubVectorValues_future> subYv_fs;
+        subYv_fs.reserve(subA.dependencies.size() );
+        for (std::set<int>::iterator it = subA.dependencies.begin();
+                it != subA.dependencies.end(); ++it)
+        {
+            subYv_fs.push_back( subYs.at(*it).subValues_f );
+        }
+
+        // function to handel and unwrapp the dependencis
+        // and call subSYMGS
+        auto unwrapper = [&y, subY]
+                (SubMatrix_future       subMtx_f,
+                 SubVectorValues_future subRHSv_f,
+                 std::vector<SubVectorValues_future> subYv_fs
+                )
+                {
+                    return subSYMGS_forward(subMtx_f.get(),
+                                            subRHSv_f.get(),
+                                            y.values,
+                                            subY.subValues_f.get()
+                                           );
+                };
+
+        // make the async call
+        using hpx::lcos::local::dataflow;
+        subY.subValues_f = dataflow(
+                hpx::launch::async, unwrapper,
+                subA.subMatrix_f,
+                subRHS.subValues_f,
+                subYv_fs
+            );
+    }
+
+    // secound loop over all subdomains
+    for(size_t i=0; i<subYs.size(); ++i)
+    {
+        SubVector & subY   = subYs.at(i);
+        SubVector & subRHS = subRHSs.at(i);
+        SubDomain & subA   = subAs.at(i);
+
+        HPX_ASSERT(subRHS.subLength == subY.subLength);
+
+        // Vector of all SubVector neighbors of this SubDomain from the x Vector
+        std::vector<SubVectorValues_future> subYv_fs;
+        subYv_fs.reserve(subA.dependencies.size() );
+        for (std::set<int>::iterator it = subA.dependencies.begin();
+                it != subA.dependencies.end(); ++it)
+        {
+            subYv_fs.push_back( subYs.at(*it).subValues_f );
+        }
+
+        // function to handel and unwrapp the dependencis
+        // and call subSYMGS
+        auto unwrapper = [&y, subY]
+                (SubMatrix_future       subMtx_f,
+                 SubVectorValues_future subRHSv_f,
+                 std::vector<SubVectorValues_future> subYv_fs
+                )
+                {
+                    return subSYMGS_revers(subMtx_f.get(),
+                                           subRHSv_f.get(),
+                                           y.values,
+                                           subY.subValues_f.get()
+                                          );
+                };
+
+        // make the async call
+        using hpx::lcos::local::dataflow;
+        subY.subValues_f = dataflow(
+                hpx::launch::async, unwrapper,
+                subA.subMatrix_f,
+                subRHS.subValues_f,
+                subYv_fs
+            );
+    }
+
+    return 0;
+}
+
+/**********TWO STEP REVERSE VERSION********************************************/
+
+/**
+ * This version of the symetic Gaus Siedel solver make use of the sub domains
+ * and using HPX to work on each sub Domain asyncron
+ * Morover it computes the second step of the Symetic GausSeidel after
+ * all depending Subdomains are finished with first step
+ * and calls the secound seap in revers order
+ */
+int ComputeSYMGS_sub_async_twostep_revers(SparseMatrix const & A,
+                                          Vector const & rhs ,
+                                          Vector & y
+                                         )
+{
+
+#ifdef HPCG_DEBUG
+    std::cout << "using SYMGS_sub_async_twosetp_reverse" << std::endl;
+#endif
+    //TODO more localytsy
+
+    std::vector<SubDomain>  & subAs =
+        *static_cast<std::vector<SubDomain>* >(A.optimizationData);
+    std::vector<SubVector>  & subRHSs =
+        *static_cast<std::vector<SubVector>* >(rhs.optimizationData);
+    std::vector<SubVector>& subYs =
+        *static_cast<std::vector<SubVector>* >(y.optimizationData);
+
+    // first loop over all subdomains
+    for(size_t i=0; i<subYs.size(); ++i)
+    {
+        SubVector & subY   = subYs.at(i);
+        SubVector & subRHS = subRHSs.at(i);
+        SubDomain & subA   = subAs.at(i);
+
+        HPX_ASSERT(subRHS.subLength == subY.subLength);
+
+        // Vector of all SubVector neighbors of this SubDomain from the x Vector
+        std::vector<SubVectorValues_future> subYv_fs;
+        subYv_fs.reserve(subA.dependencies.size() );
+        for (std::set<int>::iterator it = subA.dependencies.begin();
+                it != subA.dependencies.end(); ++it)
+        {
+            subYv_fs.push_back( subYs.at(*it).subValues_f );
+        }
+
+        // function to handel and unwrapp the dependencis
+        // and call subSYMGS
+        auto unwrapper = [&y, subY]
+                (SubMatrix_future       subMtx_f,
+                 SubVectorValues_future subRHSv_f,
+                 std::vector<SubVectorValues_future> subYv_fs
+                )
+                {
+                    return subSYMGS_forward(subMtx_f.get(),
+                                            subRHSv_f.get(),
+                                            y.values,
+                                            subY.subValues_f.get()
+                                           );
+                };
+
+        // make the async call
+        using hpx::lcos::local::dataflow;
+        subY.subValues_f = dataflow(
+                hpx::launch::async, unwrapper,
+                subA.subMatrix_f,
+                subRHS.subValues_f,
+                subYv_fs
+            );
+    }
+
+    // secound loop over all subdomains
+    for(int i=subYs.size()-1; i>=0; --i)
+    {
+        SubVector & subY   = subYs.at(i);
+        SubVector & subRHS = subRHSs.at(i);
+        SubDomain & subA   = subAs.at(i);
+
+        HPX_ASSERT(subRHS.subLength == subY.subLength);
+
+        // Vector of all SubVector neighbors of this SubDomain from the x Vector
+        std::vector<SubVectorValues_future> subYv_fs;
+        subYv_fs.reserve(subA.dependencies.size() );
+        for (std::set<int>::iterator it = subA.dependencies.begin();
+                it != subA.dependencies.end(); ++it)
+        {
+            subYv_fs.push_back( subYs.at(*it).subValues_f );
+        }
+
+        // function to handel and unwrapp the dependencis
+        // and call subSYMGS
+        auto unwrapper = [&y, subY]
+                (SubMatrix_future       subMtx_f,
+                 SubVectorValues_future subRHSv_f,
+                 std::vector<SubVectorValues_future> subYv_fs
+                )
+                {
+                    return subSYMGS_revers(subMtx_f.get(),
+                                      subRHSv_f.get(),
+                                      y.values,
+                                      subY.subValues_f.get()
+                                     );
+                };
+
+        // make the async call
+        using hpx::lcos::local::dataflow;
+        subY.subValues_f = dataflow(
+                hpx::launch::async, unwrapper,
+                subA.subMatrix_f,
+                subRHS.subValues_f,
+                subYv_fs
+            );
+    }
+
+    return 0;
+}
+
+
+/**********WRAPPER FUNCTION****************************************************/
 int ComputeSYMGS( const SparseMatrix & A, const Vector & x, Vector & y) {
   // Test vector lengths
   assert(x.localLength>=A.localNumberOfColumns);
@@ -196,7 +462,9 @@ int ComputeSYMGS( const SparseMatrix & A, const Vector & x, Vector & y) {
 
   A.isSpmvOptimized = true;
   
-  return ComputeSYMGS_sub_async(A, x, y);
+  //return ComputeSYMGS_sub_async        (A, x, y);
+  return ComputeSYMGS_sub_async_twostep(A, x, y);
+  //return ComputeSYMGS_sub_async_twostep_revers(A, x, y);
 
 }
 #endif

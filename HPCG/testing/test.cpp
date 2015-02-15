@@ -250,7 +250,41 @@ for (local_int_t i=0; i<x.localLength; ++i){
 #endif
 }
 
+{/************SYMGS TEST********************************************************/
+
+#ifdef HPCG_DEBUG
+#ifndef HPCG_NOHPX
+  CERR << "starting SYMGS test..." << ENDL;
+ 
+  // Test with ones vector = soulution
+  FillVector(x,1);
+  ComputeSYMGS(A,b,x);
+
+  when_vec(x).get();
+  // every thing should stay one
+  for (local_int_t i=0; i<x.localLength; ++i){
+    HPX_ASSERT(1 == x.values[i]);
+  }
+
+  // Test with zero vector (x and b)
+  FillVector(b,0);
+  FillVector(x,0);
+  ComputeSYMGS(A,b,x);
+
+  when_vec(x).get();
+  // every thing should stay zero
+  for (local_int_t i=0; i<x.localLength; ++i){
+    HPX_ASSERT(0 == x.values[i]);
+  }
+
+  CERR << "SYMGS test ok!" << ENDL;
+
+#endif
+#endif
+}
+
 {/************SPMV BENCHMARK****************************************************/
+#ifndef HPCG_DEBUG
 
 // no dependencis
   CERR << "starting SPMV benchmarks" << ENDL;
@@ -313,15 +347,6 @@ for (local_int_t i=0; i<x.localLength; ++i){
   //COUT << thread_time << " ms work per thread" << ENDL;
   
 // with dependencis of the target vector
-  // define hpx countesrs and timer
-  // TODO hpx counter
-  //hpx::performance_counters::performance_counter idleRate_counter (
-          //"/threads{localiti#0/total}/idle-rate");
-  //hpx::performance_counters::performance_counter thread_counter (
-          //"/threads{localiti#0/total}/count/cumulative");
-  //int idleRate =0;
-  //int threads =0;
-  //double thread_time =0.;
 
   for (; time_Bdep<BENCHTIME; repeat_Bdep*=2){
     //idleRate_counter.reset_sync();
@@ -345,16 +370,6 @@ for (local_int_t i=0; i<x.localLength; ++i){
   //COUT << thread_time << " ms work per thread" << ENDL;
   
 // with dependencis of the source vector
-  // define hpx countesrs and timer
-  // TODO hpx counter
-  //hpx::performance_counters::performance_counter idleRate_counter (
-          //"/threads{localiti#0/total}/idle-rate");
-  //hpx::performance_counters::performance_counter thread_counter (
-          //"/threads{localiti#0/total}/count/cumulative");
-  //int idleRate =0;
-  //int threads =0;
-  //double thread_time =0.;
-
   for (; time_Xdep<BENCHTIME; repeat_Xdep*=2){
     //idleRate_counter.reset_sync();
     //thread_counter.reset_sync();
@@ -378,65 +393,91 @@ for (local_int_t i=0; i<x.localLength; ++i){
   //COUT << thread_time << " ms work per thread" << ENDL;
   
 #endif
-}
-
-{/************SYMGS TEST********************************************************/
-
-#ifdef HPCG_DEBUG
-#ifndef HPCG_NOHPX
-  CERR << "starting SYMGS test..." << ENDL;
-/*
- * Vergleichen mit seriell macht kein sinn, da andere reinfolge!
-  // refference
-  ComputeSYMGS_ref(A_ref, b_ref, x_ref);
-  // optimiced
-  ComputeSYMGS    (A   , b     , x    );
-
-  // wait to finish computation
-  when_vec(x).get();
-
-  //varivate data
-  for (local_int_t i=0; i<x.localLength; ++i){
-    HPX_ASSERT(x_ref.values[i] == x.values[i]);
-  }
-*/
- 
-  // Test with ones vector = soulution
-  FillVector(x,1);
-  ComputeSYMGS(A,b,x);
-
-  when_vec(x).get();
-  // every thing should stay one
-  for (local_int_t i=0; i<x.localLength; ++i){
-    HPX_ASSERT(1 == x.values[i]);
-  }
-
-  // Test with zero vector (x and b)
-  FillVector(b,0);
-  FillVector(x,0);
-  ComputeSYMGS(A,b,x);
-
-  when_vec(x).get();
-  // every thing should stay zero
-  for (local_int_t i=0; i<x.localLength; ++i){
-    HPX_ASSERT(0 == x.values[i]);
-  }
-
-  CERR << "SYMGS test ok!" << ENDL;
-
-#endif
 #endif
 }
 
 {/************SYMGS BENCHMARK***************************************************/
+#ifndef HPCG_DEBUG
 
+  CERR << "starting SYMGS benchmarks" << ENDL;
 
+  double const BENCHTIME = 5;   // the benchmark should run at least for this time
+  int const REPEAT = 100;       // the benchmark should run at least for this number of sets
+  double time_ref = 0;          // time the benchmark takes
+  double time_opt = 0;          // time the benchmark takes
+  double time_Xdep = 0;         // time the benchmark takes
+  int repeat_ref = REPEAT;      // how offent the benchmark runs
+  int repeat_opt = REPEAT;      // how offent the benchmark runs
+  int repeat_Xdep = REPEAT ;    // how offent the benchmark runs
 
+  // recerence
+  for (; time_ref<BENCHTIME; repeat_ref*=2){
+    time_ref = mytimer();
+    for(int r=0; r<repeat_ref; ++r){
+      ComputeSYMGS_ref(A_ref, b_ref, x_ref);
+    }
+    time_ref = mytimer() - time_ref;
+  }
+  repeat_ref /= 2;
+  time_ref /= repeat_ref;
+  COUT << time_ref << " sec. average (saple size: " << repeat_ref
+       << ") non optimized runtime" << ENDL;
 
+//optimized version
+#ifndef HPCG_NOHPX
+  //int idleRate =0;
+  //int threads =0;
+  //double thread_time =0.;
+
+  for (; time_opt<BENCHTIME; repeat_opt*=2){
+    //idleRate_counter.reset_sync();
+    //thread_counter.reset_sync();
+    time_opt = mytimer();
+    for(int r=0; r<repeat_opt; ++r){
+      ComputeSYMGS(A   , b     , x    );
+      when_vec(x).get();    // wait to finish all computation
+    }
+    time_opt = mytimer() - time_opt;
+    //idleRate = idleRate_counter.get_value_sync<int>();
+    //threads   = thread_counter.get_value_sync<int>();
+  }
+  repeat_opt /= 2;
+  //thread_time = 1000. * time_opt/threads;
+  time_opt /= repeat_opt;
+  COUT << time_opt << " sec. average (saple size: " << repeat_opt
+       << ") optimized hpx runtime (inc. barriers)" << ENDL;
+  //COUT << 0.01 * idleRate << "% total idle rate"   << ENDL;
+  //COUT << threads << " total number of hpx threads" << ENDL;
+  //COUT << thread_time << " ms work per thread" << ENDL;
+
+// with dependencis of the target vector
+  for (; time_Xdep<BENCHTIME; repeat_Xdep*=2){
+    //idleRate_counter.reset_sync();
+    //thread_counter.reset_sync();
+    time_Xdep = mytimer();
+    for(int r=0; r<repeat_Xdep; ++r){
+      ComputeSYMGS   (A   , b     , x    );
+    }
+    when_vec(x).get();    // wait to finish all computation
+    time_Xdep = mytimer() - time_Xdep;
+    //idleRate = idleRate_counter.get_value_sync<int>();
+    //threads   = thread_counter.get_value_sync<int>();
+  }
+  repeat_Xdep /= 2;
+  //thread_time = 1000. * opt_time/threads;
+  time_Xdep /= repeat_Xdep;
+  COUT << time_Xdep << " sec. average (saple size: " << repeat_Xdep
+       << ") optimized hpx runtime with dependencis to the target vector" << ENDL;
+  //COUT << 0.01 * idleRate << "% total idle rate"   << ENDL;
+  //COUT << threads << " total number of hpx threads" << ENDL;
+  //COUT << thread_time << " ms work per thread" << ENDL;
+  
+#endif
+
+#endif
 }
 
 /***********FINALISE**********************************************************/
-
 #ifdef HPCG_DETAILED_DEBUG
   //if (geom->size == 1) WriteProblem(*geom, A, b, x, xexact);
 #endif
