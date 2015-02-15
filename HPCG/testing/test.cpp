@@ -317,62 +317,62 @@ for (local_int_t i=0; i<x.localLength; ++i){
 #ifndef HPCG_NOHPX
   // define hpx countesrs and timer
   // TODO warum gehn die nemmer?
-  //hpx::performance_counters::performance_counter idleRate_counter (
-          //"/threads{localiti#0/total}/idle-rate");
-  //hpx::performance_counters::performance_counter thread_counter (
-          //"/threads{localiti#0/total}/count/cumulative");
-  //int idleRate =0;
-  //int threads =0;
-  //double thread_time =0.;
+  hpx::performance_counters::performance_counter idleRate_counter (
+          "/threads{localiti#0/total}/idle-rate");
+  hpx::performance_counters::performance_counter thread_counter (
+          "/threads{localiti#0/total}/count/cumulative");
+  int idleRate =0;
+  int threads =0;
+  double thread_time =0.;
 
   for (; time_opt<BENCHTIME; repeat_opt*=2){
-    //idleRate_counter.reset_sync();
-    //thread_counter.reset_sync();
+    idleRate_counter.reset_sync();
+    thread_counter.reset_sync();
     time_opt = mytimer();
     for(int r=0; r<repeat_opt; ++r){
       ComputeSPMV    (A   , b     , x    );
       when_vec(x).get();    // wait to finish all computation
     }
     time_opt = mytimer() - time_opt;
-    //idleRate = idleRate_counter.get_value_sync<int>();
-    //threads   = thread_counter.get_value_sync<int>();
+    idleRate = idleRate_counter.get_value_sync<int>();
+    threads   = thread_counter.get_value_sync<int>();
   }
   repeat_opt /= 2;
-  //thread_time = 1000. * time_opt/threads;
+  thread_time = 1000. * time_opt/threads;
   time_opt /= repeat_opt;
   COUT << time_opt << " sec. average (saple size: " << repeat_opt
        << ") optimized hpx runtime (inc. barriers)" << ENDL;
-  //COUT << 0.01 * idleRate << "% total idle rate"   << ENDL;
-  //COUT << threads << " total number of hpx threads" << ENDL;
-  //COUT << thread_time << " ms work per thread" << ENDL;
+  COUT << 0.01 * idleRate << "% total idle rate"   << ENDL;
+  COUT << threads << " total number of hpx threads" << ENDL;
+  COUT << thread_time << " ms work per thread" << ENDL;
   
 // with dependencis of the target vector
 
   for (; time_Bdep<BENCHTIME; repeat_Bdep*=2){
-    //idleRate_counter.reset_sync();
-    //thread_counter.reset_sync();
+    idleRate_counter.reset_sync();
+    thread_counter.reset_sync();
     time_Bdep = mytimer();
     for(int r=0; r<repeat_Bdep; ++r){
       ComputeSPMV    (A   , b     , x    );
     }
     when_vec(x).get();    // wait to finish all computation
     time_Bdep = mytimer() - time_Bdep;
-    //idleRate = idleRate_counter.get_value_sync<int>();
-    //threads   = thread_counter.get_value_sync<int>();
+    idleRate  = idleRate_counter.get_value_sync<int>();
+    threads   = thread_counter.get_value_sync<int>();
   }
   repeat_Bdep /= 2;
-  //thread_time = 1000. * opt_time/threads;
+  thread_time = 1000. * time_opt/threads;
   time_Bdep /= repeat_Bdep;
   COUT << time_Bdep << " sec. average (saple size: " << repeat_Bdep
        << ") optimized hpx runtime with dependencis to the source vector" << ENDL;
-  //COUT << 0.01 * idleRate << "% total idle rate"   << ENDL;
-  //COUT << threads << " total number of hpx threads" << ENDL;
-  //COUT << thread_time << " ms work per thread" << ENDL;
+  COUT << 0.01 * idleRate << "% total idle rate"   << ENDL;
+  COUT << threads << " total number of hpx threads" << ENDL;
+  COUT << thread_time << " ms work per thread" << ENDL;
   
 // with dependencis of the source vector
   for (; time_Xdep<BENCHTIME; repeat_Xdep*=2){
-    //idleRate_counter.reset_sync();
-    //thread_counter.reset_sync();
+    idleRate_counter.reset_sync();
+    thread_counter.reset_sync();
     time_Xdep = mytimer();
     for(int r=0; r<repeat_Xdep; r+=2){
       ComputeSPMV    (A   , b     , x    );
@@ -380,17 +380,17 @@ for (local_int_t i=0; i<x.localLength; ++i){
     }
     when_vec(b).get();    // wait to finish all computation
     time_Xdep = mytimer() - time_Xdep;
-    //idleRate = idleRate_counter.get_value_sync<int>();
-    //threads   = thread_counter.get_value_sync<int>();
+    idleRate = idleRate_counter.get_value_sync<int>();
+    threads   = thread_counter.get_value_sync<int>();
   }
   repeat_Xdep /= 2;
-  //thread_time = 1000. * opt_time/threads;
+  thread_time = 1000. * time_opt/threads;
   time_Xdep /= repeat_Xdep;
   COUT << time_Xdep << " sec. average (saple size: " << repeat_Xdep
        << ") optimized hpx runtime with dependencis to target vector" << ENDL;
-  //COUT << 0.01 * idleRate << "% total idle rate"   << ENDL;
-  //COUT << threads << " total number of hpx threads" << ENDL;
-  //COUT << thread_time << " ms work per thread" << ENDL;
+  COUT << 0.01 * idleRate << "% total idle rate"   << ENDL;
+  COUT << threads << " total number of hpx threads" << ENDL;
+  COUT << thread_time << " ms work per thread" << ENDL;
   
 #endif
 #endif
@@ -425,30 +425,34 @@ for (local_int_t i=0; i<x.localLength; ++i){
 
 //optimized version
 #ifndef HPCG_NOHPX
-  //int idleRate =0;
-  //int threads =0;
-  //double thread_time =0.;
+  hpx::performance_counters::performance_counter idleRate_counter (
+          "/threads{localiti#0/total}/idle-rate");
+  hpx::performance_counters::performance_counter thread_counter (
+          "/threads{localiti#0/total}/count/cumulative");
+  int idleRate =0;
+  int threads =0;
+  double thread_time =0.;
 
   for (; time_opt<BENCHTIME; repeat_opt*=2){
-    //idleRate_counter.reset_sync();
-    //thread_counter.reset_sync();
+    idleRate_counter.reset_sync();
+    thread_counter.reset_sync();
     time_opt = mytimer();
     for(int r=0; r<repeat_opt; ++r){
       ComputeSYMGS(A   , b     , x    );
       when_vec(x).get();    // wait to finish all computation
     }
     time_opt = mytimer() - time_opt;
-    //idleRate = idleRate_counter.get_value_sync<int>();
-    //threads   = thread_counter.get_value_sync<int>();
+    idleRate = idleRate_counter.get_value_sync<int>();
+    threads   = thread_counter.get_value_sync<int>();
   }
   repeat_opt /= 2;
-  //thread_time = 1000. * time_opt/threads;
+  thread_time = 1000. * time_opt/threads;
   time_opt /= repeat_opt;
   COUT << time_opt << " sec. average (saple size: " << repeat_opt
        << ") optimized hpx runtime (inc. barriers)" << ENDL;
-  //COUT << 0.01 * idleRate << "% total idle rate"   << ENDL;
-  //COUT << threads << " total number of hpx threads" << ENDL;
-  //COUT << thread_time << " ms work per thread" << ENDL;
+  COUT << 0.01 * idleRate << "% total idle rate"   << ENDL;
+  COUT << threads << " total number of hpx threads" << ENDL;
+  COUT << thread_time << " ms work per thread" << ENDL;
 
 // with dependencis of the target vector
   for (; time_Xdep<BENCHTIME; repeat_Xdep*=2){
@@ -460,17 +464,17 @@ for (local_int_t i=0; i<x.localLength; ++i){
     }
     when_vec(x).get();    // wait to finish all computation
     time_Xdep = mytimer() - time_Xdep;
-    //idleRate = idleRate_counter.get_value_sync<int>();
-    //threads   = thread_counter.get_value_sync<int>();
+    idleRate = idleRate_counter.get_value_sync<int>();
+    threads   = thread_counter.get_value_sync<int>();
   }
   repeat_Xdep /= 2;
-  //thread_time = 1000. * opt_time/threads;
+  thread_time = 1000. * time_opt/threads;
   time_Xdep /= repeat_Xdep;
   COUT << time_Xdep << " sec. average (saple size: " << repeat_Xdep
        << ") optimized hpx runtime with dependencis to the target vector" << ENDL;
-  //COUT << 0.01 * idleRate << "% total idle rate"   << ENDL;
-  //COUT << threads << " total number of hpx threads" << ENDL;
-  //COUT << thread_time << " ms work per thread" << ENDL;
+  COUT << 0.01 * idleRate << "% total idle rate"   << ENDL;
+  COUT << threads << " total number of hpx threads" << ENDL;
+  COUT << thread_time << " ms work per thread" << ENDL;
   
 #endif
 
