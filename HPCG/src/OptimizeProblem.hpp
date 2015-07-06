@@ -15,8 +15,6 @@
 #ifndef OPTIMIZEPROBLEM_HPP
 #define OPTIMIZEPROBLEM_HPP
 
-#ifndef HPCG_NOHPX
-
 #include "SparseMatrix.hpp"
 #include "Vector.hpp"
 #include "CGData.hpp"
@@ -26,6 +24,7 @@
 #include <vector>
 #include <set>
 
+#ifndef HPCG_NOHPX
 #include <hpx/hpx.hpp>
 
 
