@@ -361,7 +361,7 @@ for (local_int_t i=0; i<x.localLength; ++i){
     threads   = thread_counter.get_value_sync<int>();
   }
   repeat_Bdep /= 2;
-  thread_time = 1000. * time_opt/threads;
+  thread_time = 1000. * time_opt/threads;   //TODO falsce Zeit
   time_Bdep /= repeat_Bdep;
   COUT << time_Bdep << " sec. average (saple size: " << repeat_Bdep
        << ") optimized hpx runtime with dependencis to the source vector" << ENDL;

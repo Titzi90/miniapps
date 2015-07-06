@@ -112,9 +112,9 @@ inline double mul(double const * mtxVal,
 // vecVal is the whole localaty vector
 // subMtx and subYv are just the subVectors
 // subYv = SubMtx * vecVal
-inline std::vector<double*> subMul(SubMatrix const & subMtx,
-                                   double const * vecVal,
-                                   SubVectorValues subYv)   //TODO warum keine Ref.????
+inline SubVectorValues subMul(SubMatrix const & subMtx,
+                              double const * vecVal,
+                              SubVectorValues subYv)   //TODO warum keine Ref.????
 {
     for (int row=0; row<subYv.size(); ++row)
     {
@@ -155,9 +155,9 @@ int ComputeSPMV_sub_async(SparseMatrix const & A, Vector const & x, Vector& y )
     // loop over all subdomains
     for(size_t i=0; i<subYs.size(); ++i)
     {
-        SubVector & subY = subYs.at(i);
-        SubVector & subX = subXs.at(i);
-        SubDomain & subA = subAs.at(i);
+        SubVector & subY = subYs.[i];
+        SubVector & subX = subXs.[i];
+        SubDomain & subA = subAs.[i];
 
         HPX_ASSERT(subX.subLength == subY.subLength);
 
@@ -168,7 +168,7 @@ int ComputeSPMV_sub_async(SparseMatrix const & A, Vector const & x, Vector& y )
         for (std::set<int>::iterator it = subA.dependencies.begin();
                 it != subA.dependencies.end(); ++it)
         {
-            subXv_fs.push_back( subXs.at(*it).subValues_f );
+            subXv_fs.push_back( subXs.[*it].subValues_f );
         }
 
         // make the async call

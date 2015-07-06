@@ -81,18 +81,18 @@ inline void GSStepper(SubMatrix const & subMtx,
                       size_t const ele
                      )
 {
-    double sum = *subRHS.at(ele);
+    double sum = *subRHS.[ele];
 
-    for (char j = 0; j < *subMtx.nonzerosInRow.at(ele); ++j)
+    for (char j = 0; j < *subMtx.nonzerosInRow.[ele]; ++j)
     {
-        sum -= subMtx.values.at(ele)[j] * yValus[ subMtx.indLoc.at(ele)[j] ];
+        sum -= subMtx.values.[ele][j] * yValus[ subMtx.indLoc.[ele][j] ];
     }
 
     // add diagonal value again as we erroneous subtracted it in the uper loop
-    sum += ( *subMtx.diagonal.at(ele) ) * ( *subY.at(ele) );
+    sum += ( *subMtx.diagonal.[ele] ) * ( *subY.[ele] );
 
     // divide by diagonal value and subscibe it to y-vector
-    *subY.at(ele) = sum / ( *subMtx.diagonal.at(ele) );
+    *subY.[ele] = sum / ( *subMtx.diagonal.[ele] );
 }
 
 /**
@@ -147,9 +147,9 @@ int ComputeSYMGS_sub_async(SparseMatrix const & A,
     // loop over all subdomains
     for(size_t i=0; i<subYs.size(); ++i)
     {
-        SubVector & subY   = subYs.at(i);
-        SubVector & subRHS = subRHSs.at(i);
-        SubDomain & subA   = subAs.at(i);
+        SubVector & subY   = subYs.[i];
+        SubVector & subRHS = subRHSs.[i];
+        SubDomain & subA   = subAs.[i];
 
         HPX_ASSERT(subRHS.subLength == subY.subLength);
 
@@ -160,7 +160,7 @@ int ComputeSYMGS_sub_async(SparseMatrix const & A,
         for (std::set<int>::iterator it = subA.dependencies.begin();
                 it != subA.dependencies.end(); ++it)
         {
-            subYv_fs.push_back( subYs.at(*it).subValues_f );
+            subYv_fs.push_back( subYs.[*it].subValues_f );
         }
 
         // function to handel and unwrapp the dependencis
@@ -251,9 +251,9 @@ int ComputeSYMGS_sub_async_twostep(SparseMatrix const & A,
     // first loop over all subdomains
     for(size_t i=0; i<subYs.size(); ++i)
     {
-        SubVector & subY   = subYs.at(i);
-        SubVector & subRHS = subRHSs.at(i);
-        SubDomain & subA   = subAs.at(i);
+        SubVector & subY   = subYs.[i];
+        SubVector & subRHS = subRHSs.[i];
+        SubDomain & subA   = subAs.[i];
 
         HPX_ASSERT(subRHS.subLength == subY.subLength);
 
@@ -263,7 +263,7 @@ int ComputeSYMGS_sub_async_twostep(SparseMatrix const & A,
         for (std::set<int>::iterator it = subA.dependencies.begin();
                 it != subA.dependencies.end(); ++it)
         {
-            subYv_fs.push_back( subYs.at(*it).subValues_f );
+            subYv_fs.push_back( subYs.[*it].subValues_f );
         }
 
         // function to handel and unwrapp the dependencis
@@ -294,9 +294,9 @@ int ComputeSYMGS_sub_async_twostep(SparseMatrix const & A,
     // secound loop over all subdomains
     for(size_t i=0; i<subYs.size(); ++i)
     {
-        SubVector & subY   = subYs.at(i);
-        SubVector & subRHS = subRHSs.at(i);
-        SubDomain & subA   = subAs.at(i);
+        SubVector & subY   = subYs.[i];
+        SubVector & subRHS = subRHSs.[i];
+        SubDomain & subA   = subAs.[i];
 
         HPX_ASSERT(subRHS.subLength == subY.subLength);
 
@@ -306,7 +306,7 @@ int ComputeSYMGS_sub_async_twostep(SparseMatrix const & A,
         for (std::set<int>::iterator it = subA.dependencies.begin();
                 it != subA.dependencies.end(); ++it)
         {
-            subYv_fs.push_back( subYs.at(*it).subValues_f );
+            subYv_fs.push_back( subYs.[*it].subValues_f );
         }
 
         // function to handel and unwrapp the dependencis
@@ -367,9 +367,9 @@ int ComputeSYMGS_sub_async_twostep_revers(SparseMatrix const & A,
     // first loop over all subdomains
     for(size_t i=0; i<subYs.size(); ++i)
     {
-        SubVector & subY   = subYs.at(i);
-        SubVector & subRHS = subRHSs.at(i);
-        SubDomain & subA   = subAs.at(i);
+        SubVector & subY   = subYs.[i];
+        SubVector & subRHS = subRHSs.[i];
+        SubDomain & subA   = subAs.[i];
 
         HPX_ASSERT(subRHS.subLength == subY.subLength);
 
@@ -379,7 +379,7 @@ int ComputeSYMGS_sub_async_twostep_revers(SparseMatrix const & A,
         for (std::set<int>::iterator it = subA.dependencies.begin();
                 it != subA.dependencies.end(); ++it)
         {
-            subYv_fs.push_back( subYs.at(*it).subValues_f );
+            subYv_fs.push_back( subYs.[*it].subValues_f );
         }
 
         // function to handel and unwrapp the dependencis
@@ -410,9 +410,9 @@ int ComputeSYMGS_sub_async_twostep_revers(SparseMatrix const & A,
     // secound loop over all subdomains
     for(int i=subYs.size()-1; i>=0; --i)
     {
-        SubVector & subY   = subYs.at(i);
-        SubVector & subRHS = subRHSs.at(i);
-        SubDomain & subA   = subAs.at(i);
+        SubVector & subY   = subYs.[i];
+        SubVector & subRHS = subRHSs.[i];
+        SubDomain & subA   = subAs.[i];
 
         HPX_ASSERT(subRHS.subLength == subY.subLength);
 
@@ -422,7 +422,7 @@ int ComputeSYMGS_sub_async_twostep_revers(SparseMatrix const & A,
         for (std::set<int>::iterator it = subA.dependencies.begin();
                 it != subA.dependencies.end(); ++it)
         {
-            subYv_fs.push_back( subYs.at(*it).subValues_f );
+            subYv_fs.push_back( subYs.[*it].subValues_f );
         }
 
         // function to handel and unwrapp the dependencis
